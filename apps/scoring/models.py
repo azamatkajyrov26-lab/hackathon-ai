@@ -330,6 +330,7 @@ class Budget(models.Model):
 class Notification(models.Model):
     TYPE_CHOICES = [
         ('submitted', 'Заявка принята'),
+        ('info', 'Информирование'),
         ('hard_filter_fail', 'Проверки не пройдены'),
         ('scored', 'Скоринг завершён'),
         ('approved', 'Заявка одобрена'),

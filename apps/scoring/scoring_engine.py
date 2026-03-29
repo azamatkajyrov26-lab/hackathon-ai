@@ -67,15 +67,19 @@ class ScoringEngine:
         hf_result = checker.check_all()
 
         if not hf_result['all_passed']:
-            # Hard filter не пройден — автоматический отказ
-            reason = self._build_rejection_reason(hf_result['failed_reasons'])
+            # Hard filter не пройден — информирование (не отказ!)
+            # Заявка НЕ отклоняется, статус "checking" сохраняется.
+            # Фермер получает подробное уведомление что нужно исправить.
+            info_message = self._build_info_notification(hf_result['failed_reasons'])
 
-            # Обновляем статус заявки
-            application.status = 'rejected'
+            application.status = 'checking'
             application.save(update_fields=['status', 'updated_at'])
 
+            # Отправляем подробное уведомление фермеру
+            self._send_hard_filter_notification(application, hf_result['failed_reasons'])
+
             logger.info(
-                'Заявка %s: hard filters FAIL — %s',
+                'Заявка %s: hard filters FAIL — информирование — %s',
                 application.number,
                 ', '.join(hf_result['failed_reasons']),
             )
@@ -86,8 +90,8 @@ class ScoringEngine:
                 'score': None,
                 'factors': [],
                 'total_score': 0,
-                'recommendation': 'reject',
-                'recommendation_reason': reason,
+                'recommendation': 'info',
+                'recommendation_reason': info_message,
             }
 
         # --- Шаг 3: Soft Factors ---
@@ -313,6 +317,77 @@ class ScoringEngine:
         else:
             return 'reject'
 
+    # Подробные рекомендации по каждому фильтру — что делать фермеру
+    FILTER_ACTIONS = {
+        'giss_registered': (
+            'Вы не зарегистрированы в ГИСС (Государственная информационная система субсидирования). '
+            'Обратитесь в местное управление сельского хозяйства для регистрации в системе Qoldau (qoldau.kz).'
+        ),
+        'has_eds': (
+            'Отсутствует действующая электронная цифровая подпись (ЭЦП). '
+            'Получите или обновите ЭЦП в ЦОН или через eGov.kz (раздел NCALayer).'
+        ),
+        'ias_rszh_registered': (
+            'Нет учётной записи в ИАС «РСЖ». '
+            'Обратитесь в районное управление сельского хозяйства для регистрации.'
+        ),
+        'has_agricultural_land': (
+            'В ЕГКН не найдены земельные участки сельскохозяйственного назначения на ваше имя. '
+            'Если земля есть — проверьте правильность регистрации в земельном кадастре. '
+            'Обратитесь в ЦОН или акимат для актуализации данных.'
+        ),
+        'esf_confirmed': (
+            'Не найдены подтверждённые электронные счёт-фактуры (ЭСФ). '
+            'Убедитесь что ваши покупки скота, кормов и оборудования оформлены через ЭСФ (esf.gov.kz). '
+            'При покупке требуйте от продавца выписку ЭСФ на ваш ИИН/БИН.'
+        ),
+        'no_unfulfilled_obligations': (
+            'У вас есть невыполненные обязательства по предыдущим субсидиям. '
+            'Необходимо исполнить условия ранее полученных субсидий или урегулировать вопрос '
+            'с управлением сельского хозяйства.'
+        ),
+        'no_block': (
+            'Ваш аккаунт заблокирован в системе субсидирования. '
+            'Причина указана в профиле. Обратитесь в управление сельского хозяйства '
+            'для разблокировки после устранения нарушений.'
+        ),
+        'animals_age_valid': (
+            'Возраст некоторых животных не соответствует требованиям для данного типа субсидии. '
+            'Проверьте возрастные ограничения в Приказе №108 для выбранного направления. '
+            'Обновите данные в ИС ИЖ через ветеринарного инспектора.'
+        ),
+        'animals_not_subsidized': (
+            'Часть заявленных животных уже получала субсидию ранее. '
+            'Субсидия на одно животное выделяется однократно. '
+            'Исключите ранее субсидированных животных из заявки.'
+        ),
+        'application_period_valid': (
+            'Заявка подана вне установленного периода приёма. '
+            'Проверьте сроки подачи заявок для вашего направления '
+            'в разделе "Периоды приёма" или уточните в управлении сельского хозяйства.'
+        ),
+        'subsidy_amount_valid': (
+            'Запрашиваемая сумма субсидии превышает 50% от стоимости. '
+            'Скорректируйте количество голов или проверьте правильность расчёта.'
+        ),
+        'min_herd_size_met': (
+            'Ваше поголовье не соответствует минимальным требованиям для данного типа субсидии. '
+            'Проверьте требования к минимальному размеру стада для выбранного направления.'
+        ),
+        'no_duplicate_application': (
+            'Вы уже подавали заявку на этот тип субсидии в текущем году. '
+            'Повторная подача на тот же тип субсидии в рамках одного года не допускается.'
+        ),
+        'is_iszh_registered': (
+            'Ваши животные не зарегистрированы в ИС ИЖ (система идентификации животных). '
+            'Обратитесь к районному ветеринару для биркования и регистрации скота.'
+        ),
+        'ibspr_registered': (
+            'Нет регистрации в ИБСПР. '
+            'Обратитесь в управление сельского хозяйства для регистрации.'
+        ),
+    }
+
     def _build_rejection_reason(self, failed_reasons: list[str]) -> str:
         """Формирует мотивированный отказ по результатам hard filters."""
         reasons_text = '; '.join(failed_reasons)
@@ -320,6 +395,63 @@ class ScoringEngine:
             f'Заявка не прошла обязательные проверки. '
             f'Не выполнены следующие условия: {reasons_text}. '
             f'Рекомендация: устранить указанные несоответствия и подать заявку повторно.'
+        )
+
+    def _build_info_notification(self, failed_reasons: list[str]) -> str:
+        """Формирует информационное сообщение (не отказ) по результатам проверок."""
+        reasons_text = '; '.join(failed_reasons)
+        return (
+            f'Обращаем ваше внимание: при проверке заявки обнаружены '
+            f'несоответствия, которые необходимо устранить: {reasons_text}. '
+            f'Подробные рекомендации направлены в ваш личный кабинет.'
+        )
+
+    def _send_hard_filter_notification(self, application, failed_reasons: list[str]):
+        """Отправляет подробное уведомление фермеру с рекомендациями по каждому фильтру."""
+        from apps.scoring.models import Notification, UserProfile
+        from apps.scoring.hard_filters import HardFilterChecker
+
+        target_user = self._find_applicant_user(application)
+        if not target_user:
+            return
+
+        # Собираем подробные рекомендации
+        details = []
+        for i, reason in enumerate(failed_reasons, 1):
+            # Пытаемся найти ключ фильтра по описанию
+            action = None
+            for key, label in HardFilterChecker.FILTER_LABELS.items():
+                if label in reason or reason in label:
+                    action = self.FILTER_ACTIONS.get(key)
+                    break
+            if not action:
+                # Поиск по ключевым словам
+                for key, act in self.FILTER_ACTIONS.items():
+                    if any(word in reason.lower() for word in key.replace('_', ' ').split()):
+                        action = act
+                        break
+            if not action:
+                action = 'Обратитесь в управление сельского хозяйства для уточнения.'
+
+            details.append(f'{i}. {reason}\n   Что делать: {action}')
+
+        details_text = '\n\n'.join(details)
+
+        message = (
+            f'По вашей заявке {application.number} проведена автоматическая проверка данных. '
+            f'Обнаружены следующие несоответствия, которые необходимо устранить:\n\n'
+            f'{details_text}\n\n'
+            f'После устранения указанных замечаний вы можете подать заявку повторно. '
+            f'Данная проверка носит информационный характер и не является отказом в субсидировании.\n\n'
+            f'По вопросам обращайтесь в управление сельского хозяйства вашего района.'
+        )
+
+        Notification.objects.create(
+            user=target_user,
+            application=application,
+            notification_type='info',
+            title=f'Информирование по заявке {application.number} — требуется обновление данных',
+            message=message,
         )
 
     def _build_recommendation_reason(
@@ -435,7 +567,7 @@ class ScoringEngine:
         if not target_user:
             return
 
-        rec_labels = {'approve': 'ОДОБРИТЬ', 'review': 'НА РАССМОТРЕНИЕ', 'reject': 'ОТКЛОНИТЬ'}
+        rec_labels = {'approve': 'ОДОБРИТЬ', 'review': 'НА РАССМОТРЕНИЕ', 'reject': 'ОТКЛОНИТЬ', 'info': 'ИНФОРМИРОВАНИЕ'}
         rec_label = rec_labels.get(recommendation, recommendation)
 
         if recommendation == 'approve' and budget_available:

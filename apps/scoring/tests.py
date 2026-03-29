@@ -836,18 +836,18 @@ class ScoringEnginePipelineTest(TestCase):
         self.assertIn(result['recommendation'], ('approve', 'review', 'reject'))
 
     @patch('apps.scoring.scoring_engine.predict_score', return_value=None)
-    def test_pipeline_hard_filter_fail_auto_reject(self, mock_ml):
-        """Hard filter failure -> auto reject, no score calculated."""
+    def test_pipeline_hard_filter_fail_info(self, mock_ml):
+        """Hard filter failure -> info (not reject), no score calculated."""
         self.entity.giss_data = {'registered': False, 'blocked': False, 'obligations_met': True}
         self.entity.save()
         engine = ScoringEngine()
         result = engine.run_scoring(self.application)
         self.assertTrue(result['success'])
         self.assertIsNone(result['score'])
-        self.assertEqual(result['recommendation'], 'reject')
+        self.assertEqual(result['recommendation'], 'info')
         self.assertEqual(result['total_score'], 0)
         self.application.refresh_from_db()
-        self.assertEqual(self.application.status, 'rejected')
+        self.assertEqual(self.application.status, 'checking')
 
     @patch('apps.scoring.scoring_engine.predict_score')
     def test_hybrid_score_calculation(self, mock_ml):
