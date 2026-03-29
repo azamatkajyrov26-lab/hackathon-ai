@@ -7,14 +7,15 @@ from django.core.paginator import Paginator
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
-from django.http import HttpResponseForbidden, JsonResponse
+from django.db import transaction
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .models import (
     Application, Applicant, SubsidyDirection, SubsidyType,
     Score, ScoreFactor, HardFilterResult, Decision, Budget, UserProfile,
-    Notification, Payment,
+    Notification, Payment, AuditLog, log_action,
 )
 
 
@@ -352,6 +353,14 @@ def application_create(request):
         except Exception:
             pass
 
+        log_action(
+            user=request.user, action='create',
+            entity_type='Application', entity_id=app.id,
+            description=f'Создана заявка {app.number} на сумму {app.total_amount} ₸',
+            request=request,
+            metadata={'number': app.number, 'subsidy_type': stype.name, 'amount': str(app.total_amount)},
+        )
+
         messages.success(request, f'Заявка {app.number} создана и оценена')
         return redirect(f'/applications/{app.id}/')
 
@@ -530,6 +539,7 @@ def application_detail(request, pk):
         'applicant_history': applicant_history,
         'history_summary': history_summary,
         'shap_data': shap_data,
+        'user_role': role,
     })
 
 
@@ -546,11 +556,19 @@ def application_decide(request, pk):
         messages.error(request, 'Заполните все поля')
         return redirect(f'/applications/{pk}/')
 
-    Decision.objects.create(
+    dec = Decision.objects.create(
         application=app,
         decision=decision_val,
         decided_by=request.user,
         reason=reason,
+    )
+
+    log_action(
+        user=request.user, action='decide',
+        entity_type='Decision', entity_id=dec.id,
+        description=f'Решение «{dec.get_decision_display()}» по заявке {app.number}: {reason}',
+        request=request,
+        metadata={'application_number': app.number, 'decision': decision_val},
     )
 
     status_map = {
@@ -717,6 +735,98 @@ def commission(request):
     })
 
 
+@role_required('commission_member', 'mio_head')
+@require_http_methods(['POST'])
+def batch_decide(request):
+    """Пакетное решение по нескольким заявкам."""
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Некорректный JSON'}, status=400)
+
+    application_ids = body.get('application_ids', [])
+    decision_val = body.get('decision', '')
+    reason = body.get('reason', '')
+
+    if not application_ids or not isinstance(application_ids, list):
+        return JsonResponse({'error': 'Укажите список заявок'}, status=400)
+
+    if decision_val not in ('approved', 'rejected'):
+        return JsonResponse({'error': 'Допустимые решения: approved, rejected'}, status=400)
+
+    if not reason or not reason.strip():
+        return JsonResponse({'error': 'Укажите обоснование'}, status=400)
+
+    status_map = {
+        'approved': 'approved',
+        'rejected': 'rejected',
+    }
+
+    processed = 0
+
+    with transaction.atomic():
+        apps = Application.objects.filter(pk__in=application_ids)
+        for app in apps:
+            Decision.objects.create(
+                application=app,
+                decision=decision_val,
+                decided_by=request.user,
+                reason=reason.strip(),
+            )
+            app.status = status_map[decision_val]
+            app.save()
+
+            # Платёжный flow: при одобрении создаём платёж
+            if decision_val == 'approved':
+                import random
+                Payment.objects.get_or_create(
+                    application=app,
+                    defaults={
+                        'amount': app.total_amount,
+                        'status': 'initiated',
+                        'treasury_ref': f'TR-{timezone.now().year}-{random.randint(100000, 999999)}',
+                        'initiated_by': request.user,
+                    },
+                )
+
+            # Уведомление заявителю
+            if decision_val == 'approved':
+                ntype, title, msg = 'approved', 'Заявка одобрена', f'Комиссия одобрила вашу заявку {app.number}. Сумма {app.total_amount} ₸ направлена на формирование платежа.'
+            else:
+                ntype, title, msg = 'rejected', 'Заявка отклонена', f'Комиссия отклонила заявку {app.number}. Причина: {reason.strip()}'
+
+            target_profile = UserProfile.objects.filter(
+                iin_bin=app.applicant.iin_bin, role='applicant'
+            ).select_related('user').first()
+            if target_profile:
+                Notification.objects.create(
+                    user=target_profile.user,
+                    application=app,
+                    notification_type=ntype,
+                    title=title,
+                    message=msg,
+                )
+
+            log_action(
+                user=request.user,
+                action='decide',
+                entity_type='Application',
+                entity_id=app.pk,
+                description=f'Пакетное решение: {decision_val} — {reason.strip()[:100]}',
+                request=request,
+                metadata={'batch': True, 'decision': decision_val},
+            )
+
+            processed += 1
+
+    decision_label = 'одобрено' if decision_val == 'approved' else 'отклонено'
+    return JsonResponse({
+        'success': True,
+        'processed': processed,
+        'message': f'Решение "{decision_label}" применено к {processed} заявкам',
+    })
+
+
 @role_required('admin')
 def emulator_panel(request):
     from apps.emulator.models import EmulatedEntity
@@ -818,6 +928,13 @@ def login_view(request):
                 )
 
             login(request, user)
+            log_action(
+                user=user, action='login',
+                entity_type='User', entity_id=user.id,
+                description=f'Вход через ЭЦП (ИИН/БИН: {iin_bin})',
+                request=request,
+                metadata={'method': 'ecp', 'iin_bin': iin_bin},
+            )
             return redirect('/dashboard/')
 
         else:
@@ -827,6 +944,13 @@ def login_view(request):
             user = authenticate(request, username=username, password=password)
             if user:
                 login(request, user)
+                log_action(
+                    user=user, action='login',
+                    entity_type='User', entity_id=user.id,
+                    description=f'Вход по логину/паролю ({username})',
+                    request=request,
+                    metadata={'method': 'password'},
+                )
                 return redirect('/dashboard/')
             messages.error(request, 'Неверные данные')
 
@@ -939,6 +1063,13 @@ def payment_action(request, pk):
         payment.status = 'sent_to_treasury'
         payment.sent_at = timezone.now()
         payment.save()
+        log_action(
+            user=request.user, action='payment',
+            entity_type='Payment', entity_id=payment.id,
+            description=f'Платёж по заявке {app.number} отправлен в Казначейство (реф: {payment.treasury_ref})',
+            request=request,
+            metadata={'application_number': app.number, 'treasury_ref': payment.treasury_ref, 'step': 'send_to_treasury'},
+        )
         messages.success(request, f'Платёж отправлен в Казначейство (реф: {payment.treasury_ref})')
     elif action == 'complete' and payment.status == 'sent_to_treasury':
         payment.status = 'completed'
@@ -946,6 +1077,13 @@ def payment_action(request, pk):
         payment.save()
         app.status = 'paid'
         app.save()
+        log_action(
+            user=request.user, action='payment',
+            entity_type='Payment', entity_id=payment.id,
+            description=f'Выплата {payment.amount} ₸ по заявке {app.number} произведена',
+            request=request,
+            metadata={'application_number': app.number, 'amount': str(payment.amount), 'step': 'completed'},
+        )
         messages.success(request, 'Выплата произведена!')
         # Уведомление владельцу заявки
         target_profile = UserProfile.objects.filter(
@@ -1280,3 +1418,419 @@ def api_form_progress(request):
     elif request.method == 'DELETE':
         cache.delete(cache_key)
         return JsonResponse({'deleted': True})
+
+
+@role_required('admin', 'auditor')
+def audit_log_view(request):
+    """Журнал аудита — доступен администраторам и аудиторам."""
+    logs = AuditLog.objects.select_related('user').all()
+
+    action_filter = request.GET.get('action', '')
+    if action_filter:
+        logs = logs.filter(action=action_filter)
+
+    search = request.GET.get('q', '')
+    if search:
+        logs = logs.filter(
+            Q(description__icontains=search) |
+            Q(entity_type__icontains=search) |
+            Q(user__username__icontains=search) |
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search)
+        )
+
+    paginator = Paginator(logs, 50)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    return render(request, 'scoring/audit_log.html', {
+        'logs': page_obj,
+        'page_obj': page_obj,
+        'action_choices': AuditLog.ACTION_CHOICES,
+        'current_action': action_filter,
+        'search_query': search,
+    })
+
+
+@role_required('mio_specialist', 'commission_member', 'mio_head', 'admin', 'auditor')
+def export_application_pdf(request, pk):
+    """Export application card as PDF."""
+    import io
+    import os
+
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (
+        SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer,
+    )
+
+    # Register Cyrillic font
+    try:
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        font_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+        font_path_bold = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+        if os.path.exists(font_path):
+            pdfmetrics.registerFont(TTFont('DejaVu', font_path))
+            if os.path.exists(font_path_bold):
+                pdfmetrics.registerFont(TTFont('DejaVu-Bold', font_path_bold))
+            else:
+                pdfmetrics.registerFont(TTFont('DejaVu-Bold', font_path))
+            FONT = 'DejaVu'
+            FONT_BOLD = 'DejaVu-Bold'
+        else:
+            FONT = 'Helvetica'
+            FONT_BOLD = 'Helvetica-Bold'
+    except Exception:
+        FONT = 'Helvetica'
+        FONT_BOLD = 'Helvetica-Bold'
+
+    app = get_object_or_404(
+        Application.objects.select_related('applicant', 'subsidy_type__direction'),
+        pk=pk,
+    )
+
+    try:
+        score = app.score
+    except Score.DoesNotExist:
+        score = None
+    factors = list(ScoreFactor.objects.filter(score=score).order_by('-weighted_value')) if score else []
+    hard_filters = HardFilterResult.objects.filter(application=app).first()
+    decisions = app.decisions.select_related('decided_by').order_by('-decided_at')
+
+    # Build PDF
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=20 * mm, bottomMargin=15 * mm,
+                            leftMargin=15 * mm, rightMargin=15 * mm)
+
+    styles = getSampleStyleSheet()
+    style_title = ParagraphStyle('TitleCyr', parent=styles['Title'],
+                                 fontName=FONT_BOLD, fontSize=16, leading=20)
+    style_h2 = ParagraphStyle('H2Cyr', parent=styles['Heading2'],
+                               fontName=FONT_BOLD, fontSize=12, leading=15,
+                               spaceBefore=12, spaceAfter=6)
+    style_normal = ParagraphStyle('NormalCyr', parent=styles['Normal'],
+                                   fontName=FONT, fontSize=9, leading=12)
+    style_small = ParagraphStyle('SmallCyr', parent=styles['Normal'],
+                                  fontName=FONT, fontSize=8, leading=10)
+
+    elements = []
+
+    # --- Header ---
+    elements.append(Paragraph(
+        f'\u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0430 \u0437\u0430\u044f\u0432\u043a\u0438 \u2116{app.number}',
+        style_title,
+    ))
+    elements.append(Spacer(1, 4 * mm))
+
+    # --- Applicant info ---
+    elements.append(Paragraph(
+        '1. \u0417\u0430\u044f\u0432\u0438\u0442\u0435\u043b\u044c', style_h2))
+    applicant_data = [
+        ['\u041d\u0430\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u0435', app.applicant.name],
+        ['\u0418\u0418\u041d/\u0411\u0418\u041d', app.applicant.iin_bin],
+        ['\u041e\u0431\u043b\u0430\u0441\u0442\u044c', app.region],
+        ['\u0420\u0430\u0439\u043e\u043d', app.district or '\u2014'],
+        ['\u0422\u0438\u043f \u0441\u0443\u0431\u044a\u0435\u043a\u0442\u0430', app.applicant.get_entity_type_display()],
+    ]
+    t = Table(applicant_data, colWidths=[55 * mm, 120 * mm])
+    t.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), FONT_BOLD),
+        ('FONTNAME', (1, 0), (1, -1), FONT),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(0.85, 0.85, 0.85)),
+        ('BACKGROUND', (0, 0), (0, -1), colors.Color(0.95, 0.95, 0.95)),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 3 * mm))
+
+    # --- Subsidy info ---
+    elements.append(Paragraph(
+        '2. \u0421\u0443\u0431\u0441\u0438\u0434\u0438\u044f', style_h2))
+    subsidy_data = [
+        ['\u041d\u0430\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435', app.subsidy_type.direction.name],
+        ['\u0412\u0438\u0434 \u0441\u0443\u0431\u0441\u0438\u0434\u0438\u0438', app.subsidy_type.name],
+        ['\u041a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e', f'{app.quantity} {app.subsidy_type.unit}'],
+        ['\u041d\u043e\u0440\u043c\u0430\u0442\u0438\u0432', f'{app.rate:,.2f} \u20b8'],
+        ['\u0421\u0443\u043c\u043c\u0430', f'{app.total_amount:,.2f} \u20b8'],
+    ]
+    t = Table(subsidy_data, colWidths=[55 * mm, 120 * mm])
+    t.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), FONT_BOLD),
+        ('FONTNAME', (1, 0), (1, -1), FONT),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(0.85, 0.85, 0.85)),
+        ('BACKGROUND', (0, 0), (0, -1), colors.Color(0.95, 0.95, 0.95)),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 3 * mm))
+
+    # --- Scoring results ---
+    if score:
+        elements.append(Paragraph(
+            '3. \u0420\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u044b \u0441\u043a\u043e\u0440\u0438\u043d\u0433\u0430',
+            style_h2,
+        ))
+
+        rec_map = {
+            'approve': '\u041e\u0434\u043e\u0431\u0440\u0438\u0442\u044c',
+            'review': '\u041d\u0430 \u0443\u0441\u043c\u043e\u0442\u0440\u0435\u043d\u0438\u0435',
+            'reject': '\u041e\u0442\u043a\u043b\u043e\u043d\u0438\u0442\u044c',
+        }
+
+        # ML/rule score from explanation if available
+        ml_score = ''
+        rule_score = ''
+        if score.explanation:
+            ml_score = score.explanation.get('ml_score', '')
+            rule_score = score.explanation.get('rule_score', '')
+
+        score_data = [
+            ['\u0418\u0442\u043e\u0433\u043e\u0432\u044b\u0439 \u0431\u0430\u043b\u043b', f'{score.total_score} / 100'],
+            ['\u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u044f',
+             rec_map.get(score.recommendation, score.recommendation)],
+        ]
+        if ml_score:
+            score_data.append(['ML Score', str(ml_score)])
+        if rule_score:
+            score_data.append(['Rule Score', str(rule_score)])
+        score_data.append([
+            '\u0412\u0435\u0440\u0441\u0438\u044f \u043c\u043e\u0434\u0435\u043b\u0438',
+            score.model_version,
+        ])
+
+        t = Table(score_data, colWidths=[55 * mm, 120 * mm])
+        t.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, -1), FONT_BOLD),
+            ('FONTNAME', (1, 0), (1, -1), FONT),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(0.85, 0.85, 0.85)),
+            ('BACKGROUND', (0, 0), (0, -1), colors.Color(0.95, 0.95, 0.95)),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 3 * mm))
+
+    # --- Hard filters ---
+    if hard_filters:
+        elements.append(Paragraph(
+            '4. \u0416\u0451\u0441\u0442\u043a\u0438\u0435 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438 (Hard Filters)',
+            style_h2,
+        ))
+
+        filter_items_pdf = [
+            ('\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f \u0432 \u0413\u0418\u0421\u0421',
+             hard_filters.giss_registered),
+            ('\u041d\u0430\u043b\u0438\u0447\u0438\u0435 \u042d\u0426\u041f', hard_filters.has_eds),
+            ('\u0423\u0447\u0451\u0442\u043d\u044b\u0439 \u043d\u043e\u043c\u0435\u0440 \u0418\u0410\u0421 \u0420\u0421\u0416',
+             hard_filters.ias_rszh_registered),
+            ('\u0417\u0435\u043c\u0435\u043b\u044c\u043d\u044b\u0439 \u0443\u0447\u0430\u0441\u0442\u043e\u043a \u0415\u0413\u041a\u041d',
+             hard_filters.has_agricultural_land),
+            ('\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f \u0432 \u0418\u0421 \u0418\u0421\u0416',
+             hard_filters.is_iszh_registered),
+            ('\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f \u0432 \u0418\u0411\u0421\u041f\u0420',
+             hard_filters.ibspr_registered),
+            ('\u042d\u0421\u0424 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0430',
+             hard_filters.esf_confirmed),
+            ('\u041d\u0435\u0442 \u043d\u0435\u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u043d\u044b\u0445 \u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u0441\u0442\u0432',
+             hard_filters.no_unfulfilled_obligations),
+            ('\u041d\u0435\u0442 \u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0438', hard_filters.no_block),
+            ('\u0412\u043e\u0437\u0440\u0430\u0441\u0442 \u0436\u0438\u0432\u043e\u0442\u043d\u044b\u0445',
+             hard_filters.animals_age_valid),
+            ('\u041d\u0435 \u0441\u0443\u0431\u0441\u0438\u0434\u0438\u0440\u043e\u0432\u0430\u043b\u0438\u0441\u044c \u0440\u0430\u043d\u0435\u0435',
+             hard_filters.animals_not_subsidized),
+            ('\u0421\u0440\u043e\u043a \u043f\u043e\u0434\u0430\u0447\u0438',
+             hard_filters.application_period_valid),
+            ('\u041b\u0438\u043c\u0438\u0442 \u0441\u0443\u043c\u043c\u044b',
+             hard_filters.subsidy_amount_valid),
+            ('\u041c\u0438\u043d. \u043f\u043e\u0433\u043e\u043b\u043e\u0432\u044c\u0435',
+             hard_filters.min_herd_size_met),
+            ('\u041d\u0435\u0442 \u0434\u0443\u0431\u043b\u0438\u043a\u0430\u0442\u043e\u0432',
+             hard_filters.no_duplicate_application),
+        ]
+
+        hf_table_data = [['\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430', '\u0420\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442']]
+        for name, passed in filter_items_pdf:
+            hf_table_data.append([name, 'PASS' if passed else 'FAIL'])
+
+        t = Table(hf_table_data, colWidths=[120 * mm, 55 * mm])
+        row_colors = []
+        for i, (name, passed) in enumerate(filter_items_pdf):
+            row_idx = i + 1
+            if passed:
+                row_colors.append(
+                    ('TEXTCOLOR', (1, row_idx), (1, row_idx), colors.Color(0, 0.5, 0)))
+            else:
+                row_colors.append(
+                    ('TEXTCOLOR', (1, row_idx), (1, row_idx), colors.Color(0.8, 0, 0)))
+
+        t.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, 0), FONT_BOLD),
+            ('FONTNAME', (0, 1), (0, -1), FONT),
+            ('FONTNAME', (1, 1), (1, -1), FONT_BOLD),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(0.85, 0.85, 0.85)),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.9, 0.9, 0.9)),
+            ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+        ] + row_colors))
+        elements.append(t)
+
+        overall = 'PASS' if hard_filters.all_passed else 'FAIL'
+        overall_color = '006600' if hard_filters.all_passed else 'CC0000'
+        elements.append(Spacer(1, 2 * mm))
+        elements.append(Paragraph(
+            f'<font color="#{overall_color}"><b>'
+            f'\u0418\u0442\u043e\u0433: {overall} '
+            f'({sum(1 for _, p in filter_items_pdf if p)}/{len(filter_items_pdf)})'
+            f'</b></font>',
+            style_normal,
+        ))
+        elements.append(Spacer(1, 3 * mm))
+
+    # --- SHAP top 5 ---
+    if score and score.explanation and score.explanation.get('shap_values'):
+        elements.append(Paragraph(
+            '5. SHAP \u2014 \u0442\u043e\u043f 5 \u0444\u0430\u043a\u0442\u043e\u0440\u043e\u0432',
+            style_h2,
+        ))
+        shap_items = score.explanation['shap_values'][:5]
+        shap_table_data = [
+            ['\u0424\u0430\u043a\u0442\u043e\u0440',
+             '\u0417\u043d\u0430\u0447\u0435\u043d\u0438\u0435 SHAP',
+             '\u0412\u043b\u0438\u044f\u043d\u0438\u0435'],
+        ]
+        for item in shap_items:
+            val = item.get('shap_value', 0)
+            direction = ('\u2191 \u041f\u043e\u0432\u044b\u0448\u0430\u0435\u0442'
+                         if val >= 0
+                         else '\u2193 \u0421\u043d\u0438\u0436\u0430\u0435\u0442')
+            shap_table_data.append([
+                item.get('feature_ru', item.get('feature', '')),
+                f'{val:+.2f}',
+                direction,
+            ])
+
+        t = Table(shap_table_data, colWidths=[90 * mm, 40 * mm, 45 * mm])
+        t.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, 0), FONT_BOLD),
+            ('FONTNAME', (0, 1), (-1, -1), FONT),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(0.85, 0.85, 0.85)),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.9, 0.9, 0.9)),
+            ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 3 * mm))
+
+    # --- Soft factors ---
+    if factors:
+        section_num = 6 if (
+            score and score.explanation and score.explanation.get('shap_values')
+        ) else 5
+        elements.append(Paragraph(
+            f'{section_num}. \u0424\u0430\u043a\u0442\u043e\u0440\u044b \u0441\u043a\u043e\u0440\u0438\u043d\u0433\u0430 (Soft Factors)',
+            style_h2,
+        ))
+
+        factors_table_data = [
+            ['\u0424\u0430\u043a\u0442\u043e\u0440',
+             '\u0417\u043d\u0430\u0447\u0435\u043d\u0438\u0435',
+             '\u041c\u0430\u043a\u0441\u0438\u043c\u0443\u043c',
+             '\u0412\u0435\u0441',
+             '\u0412\u0437\u0432\u0435\u0448\u0435\u043d\u043d\u043e\u0435'],
+        ]
+        for f in factors[:8]:
+            factors_table_data.append([
+                f.factor_name,
+                f'{f.value}',
+                f'{f.max_value}',
+                f'{f.weight}',
+                f'{f.weighted_value}',
+            ])
+
+        t = Table(factors_table_data, colWidths=[70 * mm, 25 * mm, 25 * mm, 25 * mm, 30 * mm])
+        t.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, 0), FONT_BOLD),
+            ('FONTNAME', (0, 1), (-1, -1), FONT),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(0.85, 0.85, 0.85)),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.9, 0.9, 0.9)),
+            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 3 * mm))
+
+    # --- Decision ---
+    last_decision = decisions.first()
+    if last_decision:
+        dec_map = {
+            'approved': '\u041e\u0434\u043e\u0431\u0440\u0435\u043d\u043e',
+            'rejected': '\u041e\u0442\u043a\u0430\u0437',
+            'review': '\u0414\u043e\u043f. \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430',
+            'partially_approved': '\u0427\u0430\u0441\u0442\u0438\u0447\u043d\u043e \u043e\u0434\u043e\u0431\u0440\u0435\u043d\u043e',
+        }
+        section_num_dec = 7
+        elements.append(Paragraph(
+            f'{section_num_dec}. \u0420\u0435\u0448\u0435\u043d\u0438\u0435', style_h2))
+        dec_data = [
+            ['\u0420\u0435\u0448\u0435\u043d\u0438\u0435',
+             dec_map.get(last_decision.decision, last_decision.decision)],
+            ['\u041f\u0440\u0438\u043d\u044f\u043b',
+             last_decision.decided_by.get_full_name()],
+            ['\u041e\u0431\u043e\u0441\u043d\u043e\u0432\u0430\u043d\u0438\u0435',
+             last_decision.reason or '\u2014'],
+            ['\u0414\u0430\u0442\u0430',
+             last_decision.decided_at.strftime('%d.%m.%Y %H:%M')
+             if last_decision.decided_at else '\u2014'],
+        ]
+
+        t = Table(dec_data, colWidths=[55 * mm, 120 * mm])
+        t.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, -1), FONT_BOLD),
+            ('FONTNAME', (1, 0), (1, -1), FONT),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(0.85, 0.85, 0.85)),
+            ('BACKGROUND', (0, 0), (0, -1), colors.Color(0.95, 0.95, 0.95)),
+        ]))
+        elements.append(t)
+
+    # --- Footer ---
+    elements.append(Spacer(1, 8 * mm))
+    elements.append(Paragraph(
+        f'\u0421\u0444\u043e\u0440\u043c\u0438\u0440\u043e\u0432\u0430\u043d\u043e: '
+        f'{timezone.now().strftime("%d.%m.%Y %H:%M")} | '
+        f'\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c: '
+        f'{request.user.get_full_name() or request.user.username} | '
+        f'SubsidyAI',
+        style_small,
+    ))
+
+    doc.build(elements)
+    buf.seek(0)
+
+    response = HttpResponse(buf.read(), content_type='application/pdf')
+    response['Content-Disposition'] = (
+        f'attachment; filename="application_{app.number}.pdf"'
+    )
+    return response

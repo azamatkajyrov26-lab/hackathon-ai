@@ -3,6 +3,7 @@ from .models import (
     UserProfile, Applicant, SubsidyDirection, SubsidyType,
     Application, ApplicationDocument, HardFilterResult,
     Score, ScoreFactor, Decision, Budget, ApplicationPeriod,
+    AuditLog,
 )
 
 
@@ -108,3 +109,24 @@ class ApplicationPeriodAdmin(admin.ModelAdmin):
     list_display = ('direction', 'is_year_round', 'start_day', 'start_month', 'end_day', 'end_month')
     list_filter = ('is_year_round',)
     search_fields = ('direction__name',)
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'user', 'action', 'entity_type', 'entity_id', 'description', 'ip_address')
+    list_filter = ('action', 'entity_type', 'created_at')
+    search_fields = ('description', 'user__username', 'user__first_name', 'user__last_name', 'ip_address')
+    readonly_fields = (
+        'user', 'action', 'entity_type', 'entity_id',
+        'description', 'ip_address', 'metadata', 'created_at',
+    )
+    date_hierarchy = 'created_at'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

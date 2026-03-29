@@ -381,3 +381,54 @@ class Payment(models.Model):
 
     def __str__(self):
         return f'Платёж {self.application.number} — {self.get_status_display()}'
+
+
+class AuditLog(models.Model):
+    ACTION_CHOICES = [
+        ('create', 'Создание'),
+        ('update', 'Обновление'),
+        ('score', 'Скоринг'),
+        ('decide', 'Решение комиссии'),
+        ('confirm', 'Подтверждение'),
+        ('payment', 'Выплата'),
+        ('block', 'Блокировка'),
+        ('login', 'Вход в систему'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    entity_type = models.CharField(max_length=100)
+    entity_id = models.IntegerField(null=True, blank=True)
+    description = models.TextField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Запись аудита'
+        verbose_name_plural = 'Журнал аудита'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'[{self.created_at:%d.%m.%Y %H:%M}] {self.get_action_display()} — {self.entity_type}'
+
+
+def log_action(user, action, entity_type, entity_id, description, request=None, metadata=None):
+    """Создаёт запись в журнале аудита."""
+    ip_address = None
+    if request:
+        x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded:
+            ip_address = x_forwarded.split(',')[0].strip()
+        else:
+            ip_address = request.META.get('REMOTE_ADDR')
+
+    return AuditLog.objects.create(
+        user=user if user and user.is_authenticated else None,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        description=description,
+        ip_address=ip_address,
+        metadata=metadata or {},
+    )

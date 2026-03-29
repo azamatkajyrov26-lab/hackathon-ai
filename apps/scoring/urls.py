@@ -9,9 +9,11 @@ urlpatterns = [
     path('applications/<int:pk>/', views.application_detail, name='application_detail'),
     path('applications/<int:pk>/decide/', views.application_decide, name='application_decide'),
     path('applications/<int:pk>/payment/', views.payment_action, name='payment_action'),
+    path('applications/<int:pk>/pdf/', views.export_application_pdf, name='application_pdf'),
     path('scoring/', views.scoring_ranking, name='scoring_ranking'),
     path('analytics/', views.analytics, name='analytics'),
     path('commission/', views.commission, name='commission'),
+    path('commission/batch/', views.batch_decide, name='batch_decide'),
     path('emulator/', views.emulator_panel, name='emulator_panel'),
     path('emulator/<int:pk>/', views.entity_detail, name='entity_detail'),
     path('emulator/<int:pk>/edit/', views.entity_edit, name='entity_edit'),
@@ -20,4 +22,5 @@ urlpatterns = [
     path('api/entity-data/<str:iin_bin>/', views.api_entity_data, name='api_entity_data'),
     path('model-info/', views.model_info_view, name='model_info'),
     path('api/form-progress/', views.api_form_progress, name='api_form_progress'),
+    path('audit-log/', views.audit_log_view, name='audit_log'),
 ]

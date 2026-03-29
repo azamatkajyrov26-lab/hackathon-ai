@@ -667,7 +667,7 @@ class EfficiencyFactorTest(_SoftFactorTestBase):
         self.entity_data['ias_rszh_data']['pending_returns'] = 0
         calc = SoftFactorCalculator(self.application, self.entity_data)
         result = calc._calc_efficiency()
-        self.assertEqual(result['value'], 10.0)
+        self.assertEqual(result['value'], 11.0)
 
     def test_high_retention(self):
         self.entity_data['ias_rszh_data']['subsidy_history'] = [

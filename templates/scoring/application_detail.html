@@ -82,6 +82,11 @@
                 {% endif %}
             </div>
             <p class="text-sm text-gray-500 mt-1">{{ app.applicant.name }} · {{ app.region }}{% if app.district %}, {{ app.district }}{% endif %}</p>
+            {% if user_role != 'applicant' %}
+            <a href="{% url 'application_pdf' app.id %}" class="inline-flex items-center gap-2 mt-2 px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                <i class="fas fa-file-pdf text-red-500"></i> Скачать PDF
+            </a>
+            {% endif %}
         </div>
 
         {% if score %}
