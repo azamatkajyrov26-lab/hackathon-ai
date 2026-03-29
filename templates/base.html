@@ -134,6 +134,14 @@
                     Дашборд
                 </a>
 
+                <!-- Мое хозяйство: только для applicant -->
+                {% if user_role == 'applicant' %}
+                <a href="/my-farm/" class="nav-item flex items-center gap-3 {% if '/my-farm' in request.path %}active{% endif %}">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
+                    Мое хозяйство
+                </a>
+                {% endif %}
+
                 <!-- Заявки: applicant, mio_specialist, mio_head, admin -->
                 {% if user_role == 'applicant' or user_role == 'mio_specialist' or user_role == 'mio_head' or user_role == 'admin' %}
                 <a href="/applications/" class="nav-item flex items-center gap-3 {% if '/applications' in request.path %}active{% endif %}">

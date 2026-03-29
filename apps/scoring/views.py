@@ -827,6 +827,268 @@ def batch_decide(request):
     })
 
 
+@role_required('applicant')
+def farmer_dashboard(request):
+    """Личный кабинет фермера — данные из всех внешних систем."""
+    from apps.emulator.models import EmulatedEntity
+    from collections import defaultdict
+
+    iin_bin = getattr(request.user.profile, 'iin_bin', '')
+    entity = None
+    if iin_bin:
+        entity = EmulatedEntity.objects.filter(iin_bin=iin_bin).first()
+
+    if not entity:
+        return render(request, 'scoring/farmer_dashboard.html', {'entity': None})
+
+    # --- Animals grouped by type ---
+    animals = entity.is_iszh_data.get('animals', [])
+    animals_by_type = defaultdict(list)
+    for a in animals:
+        animals_by_type[a.get('type', 'other')].append(a)
+    animals_by_type = dict(animals_by_type)
+
+    animal_summary = {
+        'total': len(animals),
+        'verified': entity.is_iszh_data.get('total_verified', 0),
+        'rejected': entity.is_iszh_data.get('total_rejected', 0),
+        'cattle': len(animals_by_type.get('cattle', [])),
+        'sheep': len(animals_by_type.get('sheep', [])),
+        'horse': len(animals_by_type.get('horse', [])),
+        'poultry': len(animals_by_type.get('poultry', [])),
+    }
+
+    # --- Pre-scoring estimate (5 of 8 factors, no Application needed) ---
+    giss = entity.giss_data or {}
+    rszh = entity.ias_rszh_data or {}
+    egkn = entity.egkn_data or {}
+    iszh = entity.is_iszh_data or {}
+    esf = entity.is_esf_data or {}
+
+    pre_factors = []
+
+    # Factor 1: Subsidy History
+    history = rszh.get('subsidy_history', [])
+    total_subs = len(history)
+    successful = sum(1 for h in history if h.get('status') == 'executed' and h.get('obligations_met', False))
+    sr = successful / total_subs if total_subs > 0 else 0
+    if total_subs == 0:
+        f1_score = 10.0
+    elif sr >= 0.9:
+        f1_score = 18 + min(total_subs, 2)
+    elif sr >= 0.7:
+        f1_score = 14 + (sr - 0.7) * 20
+    elif sr >= 0.5:
+        f1_score = 8 + (sr - 0.5) * 30
+    else:
+        f1_score = sr * 16
+    # Counter-obligations penalty
+    total_received = giss.get('total_subsidies_received', 0)
+    if total_received > 100_000_000:
+        prev_yr = giss.get('gross_production_previous_year', 0)
+        yr_before = giss.get('gross_production_year_before', 0)
+        if yr_before > 0 and prev_yr < yr_before:
+            consec = giss.get('consecutive_decline_years', 0)
+            f1_score -= 6.0 if consec >= 2 else 3.0
+    f1_score = min(20.0, max(0.0, f1_score))
+    pre_factors.append({
+        'name': 'История субсидий', 'value': round(f1_score, 1),
+        'max_value': 20, 'percentage': round(f1_score / 20 * 100),
+        'status': 'good' if f1_score >= 14 else ('warn' if f1_score >= 8 else 'bad'),
+        'explanation': f'{total_subs} субсидий, {successful} успешных ({sr:.0%})' if total_subs > 0 else 'Нет истории — нейтральный балл',
+    })
+
+    # Factor 2: Production Growth
+    gr = giss.get('growth_rate', 0)
+    if gr >= 10:
+        f2_score = 20.0
+    elif gr >= 5:
+        f2_score = 14 + (gr - 5) * 1.2
+    elif gr >= 0:
+        f2_score = 8 + gr * 1.2
+    elif gr >= -5:
+        f2_score = 4 + (gr + 5) * 0.8
+    else:
+        f2_score = max(0, 4 + gr * 0.4)
+    f2_score = min(20.0, max(0.0, f2_score))
+    pre_factors.append({
+        'name': 'Рост производства', 'value': round(f2_score, 1),
+        'max_value': 20, 'percentage': round(f2_score / 20 * 100),
+        'status': 'good' if gr >= 3 else ('warn' if gr >= 0 else 'bad'),
+        'explanation': f'Рост {gr:+.1f}%' if gr != 0 else 'Нет данных о производстве',
+    })
+
+    # Factor 3: Farm Size
+    land_area = egkn.get('total_agricultural_area', 0)
+    herd_size = iszh.get('total_verified', 0)
+    l_sc = min(8.0, max(0.0, (4 + (land_area - 100) / 100) if land_area >= 100 else (land_area / 25 if land_area >= 10 else 0)))
+    h_sc = min(7.0, max(0.0, (3.5 + (herd_size - 50) / 42.8) if herd_size >= 50 else (herd_size / 14.3 if herd_size >= 10 else 0)))
+    if land_area >= 500:
+        l_sc = 8.0
+    if herd_size >= 200:
+        h_sc = 7.0
+    f3_score = min(15.0, l_sc + h_sc)
+    pre_factors.append({
+        'name': 'Размер хозяйства', 'value': round(f3_score, 1),
+        'max_value': 15, 'percentage': round(f3_score / 15 * 100),
+        'status': 'good' if f3_score >= 10 else ('warn' if f3_score >= 5 else 'bad'),
+        'explanation': f'{land_area:.0f} га земли, {herd_size} голов',
+    })
+
+    # Factor 4: Efficiency
+    total_heads = sum(h.get('heads', 0) for h in history)
+    returns = rszh.get('pending_returns', 0)
+    if total_heads == 0:
+        f4_score = 10.0
+    else:
+        ret_rate = max(0.0, min(1.0, 1 - (returns / total_heads)))
+        if ret_rate >= 0.98:
+            f4_score = 15.0
+        elif ret_rate >= 0.90:
+            f4_score = 11 + (ret_rate - 0.90) * 50
+        elif ret_rate >= 0.80:
+            f4_score = 7 + (ret_rate - 0.80) * 40
+        else:
+            f4_score = ret_rate * 8.75
+    # Counter-obligations bonus/penalty
+    prev_yr = giss.get('gross_production_previous_year', 0)
+    yr_before = giss.get('gross_production_year_before', 0)
+    if total_received > 100_000_000 and yr_before > 0:
+        if prev_yr >= yr_before:
+            f4_score += 2.0
+        elif giss.get('consecutive_decline_years', 0) >= 2:
+            f4_score -= 5.0
+        else:
+            f4_score -= 2.0
+    elif yr_before > 0 and prev_yr >= yr_before:
+        f4_score += 1.0
+    f4_score = min(15.0, max(0.0, f4_score))
+    pre_factors.append({
+        'name': 'Эффективность', 'value': round(f4_score, 1),
+        'max_value': 15, 'percentage': round(f4_score / 15 * 100),
+        'status': 'good' if f4_score >= 10 else ('warn' if f4_score >= 6 else 'bad'),
+        'explanation': f'{returns} невозвратов' if total_heads > 0 else 'Нет истории',
+    })
+
+    # Factor 5: Entity Type (no application needed)
+    et = entity.entity_type
+    f5_score = 5.0 if et == 'cooperative' else (4.0 if et == 'legal' else 3.0)
+    pre_factors.append({
+        'name': 'Тип заявителя', 'value': round(f5_score, 1),
+        'max_value': 5, 'percentage': round(f5_score / 5 * 100),
+        'status': 'good' if f5_score >= 4 else 'warn',
+        'explanation': {'cooperative': 'СПК', 'legal': 'Юрлицо', 'individual': 'Физлицо'}.get(et, et),
+    })
+
+    # Neutral estimates for application-dependent factors
+    pre_factors.append({
+        'name': 'Соответствие нормативу', 'value': 7.0, 'max_value': 10,
+        'percentage': 70, 'status': 'warn',
+        'explanation': 'Зависит от конкретной заявки',
+    })
+    pre_factors.append({
+        'name': 'Региональный приоритет', 'value': 5.0, 'max_value': 10,
+        'percentage': 50, 'status': 'warn',
+        'explanation': f'{entity.region} — зависит от направления',
+    })
+    pre_factors.append({
+        'name': 'Первичность заявителя', 'value': 3.0, 'max_value': 5,
+        'percentage': 60, 'status': 'warn',
+        'explanation': 'Зависит от направления',
+    })
+
+    total_pre_score = sum(f['value'] for f in pre_factors)
+    max_possible = sum(f['max_value'] for f in pre_factors)
+
+    weak_areas = [f['name'] for f in pre_factors if f['status'] == 'bad']
+    if total_pre_score >= 70:
+        rec = 'Хорошие шансы на одобрение'
+        rec_class = 'rec-approve'
+    elif total_pre_score >= 45:
+        rec = 'Средние шансы — обратите внимание на слабые места'
+        rec_class = 'rec-review'
+    else:
+        rec = 'Низкие шансы — рекомендуем улучшить показатели'
+        rec_class = 'rec-reject'
+
+    pre_score = {
+        'total': round(total_pre_score, 1),
+        'max': max_possible,
+        'factors': pre_factors,
+        'recommendation': rec,
+        'rec_class': rec_class,
+        'weak_areas': weak_areas,
+    }
+
+    # --- Hard filter quick summary ---
+    hf_passed = 0
+    hf_failed = []
+    if giss.get('registered'):
+        hf_passed += 1
+    else:
+        hf_failed.append('Не зарегистрирован в ГИСС')
+    if rszh.get('registered'):
+        hf_passed += 1
+    else:
+        hf_failed.append('Не зарегистрирован в ИАС РСЖ')
+    if not giss.get('blocked', False):
+        hf_passed += 1
+    else:
+        hf_failed.append(f'Заблокирован: {giss.get("block_reason", "?")}')
+    if entity.easu_data and entity.easu_data.get('has_account_number'):
+        hf_passed += 1
+    else:
+        hf_failed.append('Нет расчётного счёта')
+    if egkn.get('has_agricultural_land'):
+        hf_passed += 1
+    else:
+        hf_failed.append('Нет с/х земли')
+    if rszh.get('pending_returns', 0) == 0:
+        hf_passed += 1
+    else:
+        hf_failed.append(f'Невозврат: {rszh["pending_returns"]} тг')
+    confirmed_esf = any(
+        inv.get('status') == 'confirmed'
+        for inv in esf.get('invoices', [])
+    )
+    if confirmed_esf:
+        hf_passed += 1
+    else:
+        hf_failed.append('Нет подтверждённых ЭСФ')
+
+    hard_filter_summary = {
+        'total': 15,
+        'passed': hf_passed,
+        'checkable': hf_passed + len(hf_failed),
+        'failed_reasons': hf_failed,
+    }
+
+    # --- My applications ---
+    my_apps = Application.objects.filter(
+        applicant__iin_bin=iin_bin
+    ).select_related('subsidy_type__direction').order_by('-created_at')[:10]
+
+    context = {
+        'entity': entity,
+        'animals': animals,
+        'animals_by_type': animals_by_type,
+        'animal_summary': animal_summary,
+        'subsidy_history': history,
+        'giss_data': giss,
+        'ias_rszh_data': rszh,
+        'invoices': esf.get('invoices', []),
+        'esf_summary': esf,
+        'plots': egkn.get('plots', []),
+        'egkn_data': egkn,
+        'easu_data': entity.easu_data or {},
+        'payments': (entity.treasury_data or {}).get('payments', []),
+        'pre_score': pre_score,
+        'my_applications': my_apps,
+        'hard_filter_summary': hard_filter_summary,
+    }
+    return render(request, 'scoring/farmer_dashboard.html', context)
+
+
 @role_required('admin')
 def emulator_panel(request):
     from apps.emulator.models import EmulatedEntity

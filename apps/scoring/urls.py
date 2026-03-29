@@ -22,5 +22,6 @@ urlpatterns = [
     path('api/entity-data/<str:iin_bin>/', views.api_entity_data, name='api_entity_data'),
     path('model-info/', views.model_info_view, name='model_info'),
     path('api/form-progress/', views.api_form_progress, name='api_form_progress'),
+    path('my-farm/', views.farmer_dashboard, name='farmer_dashboard'),
     path('audit-log/', views.audit_log_view, name='audit_log'),
 ]
