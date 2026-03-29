@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${DB_NAME:-hackathon}
+      POSTGRES_USER: ${DB_USER:-hackathon}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-hackathon}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-hackathon}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: sh /app/entrypoint.sh
+    volumes:
+      - static_files:/app/staticfiles
+      - media_files:/app/media
+      - ml_models:/app/apps/scoring/ml_models
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=${DEBUG:-1}
+      - SECRET_KEY=${SECRET_KEY:-hackathon-dev-secret-key}
+      - DB_NAME=${DB_NAME:-hackathon}
+      - DB_USER=${DB_USER:-hackathon}
+      - DB_PASSWORD=${DB_PASSWORD:-hackathon}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  static_files:
+  media_files:
+  ml_models:

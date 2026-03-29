@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Доступ запрещён — SubsidyAI{% endblock %}
+{% block page_title %}Доступ запрещён{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto mt-16 text-center fade-in">
+    <div class="card-glass p-10">
+        <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-5">
+            <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="#DC2626" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+            </svg>
+        </div>
+        <h2 class="text-xl font-bold text-gray-900 mb-2">Нет доступа</h2>
+        <p class="text-gray-500 text-sm mb-6">
+            У вашей роли <span class="font-semibold text-gray-700">({{ user.profile.get_role_display }})</span> нет прав для просмотра этой страницы.
+        </p>
+        <a href="/dashboard/" class="btn-lime inline-flex items-center gap-2">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            Вернуться на дашборд
+        </a>
+    </div>
+</div>
+{% endblock %}

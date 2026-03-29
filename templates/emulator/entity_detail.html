@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ entity.name }} — SubsidyAI{% endblock %}
+{% block page_title %}Показатели хозяйства{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="fade-in max-w-5xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex items-start justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">{{ entity.name }}</h1>
+            <div class="flex items-center gap-3 mt-2 text-sm text-gray-500">
+                <span class="font-mono bg-gray-100 px-2 py-0.5 rounded">{{ entity.iin_bin }}</span>
+                <span>{{ entity.get_entity_type_display }}</span>
+                <span>{{ entity.region }}, {{ entity.district }}</span>
+                {% if entity.risk_profile == 'clean' %}
+                <span class="badge-success px-2 py-0.5 rounded text-xs">Чистый</span>
+                {% elif entity.risk_profile == 'minor_issues' %}
+                <span class="badge-warning px-2 py-0.5 rounded text-xs">Мелкие нарушения</span>
+                {% elif entity.risk_profile == 'risky' %}
+                <span class="badge-error px-2 py-0.5 rounded text-xs">Рискованный</span>
+                {% else %}
+                <span class="px-2 py-0.5 rounded text-xs" style="background:#FCA5A5;color:#7F1D1D;">Мошеннический</span>
+                {% endif %}
+            </div>
+        </div>
+        <a href="/emulator/{{ entity.pk }}/edit/" class="btn-lime text-sm py-2.5 px-5">
+            <i class="fas fa-edit mr-1"></i> Редактировать
+        </a>
+    </div>
+
+    <!-- Farm Indicators Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for section_key, section in farm_indicators.items %}
+        <div class="card-glass p-5 slide-up" style="animation-delay: {{ forloop.counter0 }}s">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                {% if section_key == 'production' %}<i class="fas fa-chart-line text-green-500"></i>
+                {% elif section_key == 'land' %}<i class="fas fa-mountain text-amber-500"></i>
+                {% elif section_key == 'livestock' %}<i class="fas fa-horse text-blue-500"></i>
+                {% elif section_key == 'subsidies' %}<i class="fas fa-hand-holding-usd text-purple-500"></i>
+                {% elif section_key == 'obligations' %}<i class="fas fa-clipboard-check text-indigo-500"></i>
+                {% elif section_key == 'finance' %}<i class="fas fa-file-invoice-dollar text-teal-500"></i>
+                {% endif %}
+                {{ section.label }}
+            </h3>
+            <div class="space-y-2">
+                {% for item in section.items %}
+                <div class="flex justify-between items-center py-1.5 border-b border-gray-100 last:border-0">
+                    <span class="text-xs text-gray-500">{{ item.key }}</span>
+                    <span class="text-sm font-medium text-gray-900">{{ item.value }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Back link -->
+    <div class="flex gap-3">
+        <a href="/emulator/" class="btn-ghost-custom text-sm py-2 px-4">
+            <i class="fas fa-arrow-left mr-1"></i> К списку
+        </a>
+    </div>
+</div>
+{% endblock %}

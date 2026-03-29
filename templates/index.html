@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SubsidyAI — Интеллектуальная система скоринга субсидий</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Inter', sans-serif; color: #1F2937; background: #F7F8FA; line-height: 1.6; }
+        a { text-decoration: none; color: inherit; }
+
+        /* ── NAV ── */
+        .nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 1rem 2.5rem;
+            background: rgba(26,26,46,.85); backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(193,255,0,.12);
+        }
+        .nav-logo { font-weight: 800; font-size: 1.35rem; color: #fff; letter-spacing: -.02em; }
+        .nav-logo span { color: #C1FF00; }
+        .nav-links { display: flex; gap: 2rem; }
+        .nav-links a { color: #ffffffbb; font-size: .875rem; font-weight: 500; transition: color .2s; }
+        .nav-links a:hover { color: #C1FF00; }
+        .nav-cta {
+            padding: .55rem 1.4rem; border-radius: .5rem; font-weight: 600; font-size: .875rem;
+            background: #C1FF00; color: #1A1A2E; transition: background .2s;
+        }
+        .nav-cta:hover { background: #A8E000; }
+
+        /* ── HERO ── */
+        .hero {
+            min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 7rem 1.5rem 5rem;
+            background: #1A1A2E;
+            position: relative; overflow: hidden;
+        }
+        .hero::before {
+            content: ''; position: absolute; width: 700px; height: 700px;
+            background: radial-gradient(circle, rgba(193,255,0,.08) 0%, transparent 70%);
+            top: -200px; right: -200px; pointer-events: none;
+        }
+        .hero::after {
+            content: ''; position: absolute; width: 500px; height: 500px;
+            background: radial-gradient(circle, rgba(193,255,0,.06) 0%, transparent 70%);
+            bottom: -150px; left: -150px; pointer-events: none;
+        }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: .5rem;
+            padding: .45rem 1.1rem; border-radius: 50px;
+            background: rgba(193,255,0,.1); border: 1px solid rgba(193,255,0,.25);
+            color: #C1FF00; font-size: .8rem; font-weight: 600; margin-bottom: 2rem;
+            letter-spacing: .03em; text-transform: uppercase;
+        }
+        .hero h1 {
+            font-size: clamp(2.8rem, 6vw, 5rem); font-weight: 900; color: #fff;
+            letter-spacing: -.03em; line-height: 1.05; margin-bottom: 1.5rem;
+        }
+        .hero h1 span { color: #C1FF00; }
+        .hero p {
+            max-width: 680px; font-size: clamp(1rem, 2vw, 1.25rem);
+            color: rgba(255,255,255,.65); line-height: 1.7; margin-bottom: 2.8rem;
+        }
+        .hero-buttons { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+        .btn-lime {
+            padding: .85rem 2.2rem; border-radius: .6rem; font-weight: 700; font-size: 1rem;
+            background: #C1FF00; color: #1A1A2E; transition: background .2s, transform .15s;
+            display: inline-flex; align-items: center; gap: .5rem;
+        }
+        .btn-lime:hover { background: #A8E000; transform: translateY(-2px); }
+        .btn-outline {
+            padding: .85rem 2.2rem; border-radius: .6rem; font-weight: 700; font-size: 1rem;
+            background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.3);
+            transition: border-color .2s, transform .15s;
+            display: inline-flex; align-items: center; gap: .5rem;
+        }
+        .btn-outline:hover { border-color: #C1FF00; color: #C1FF00; transform: translateY(-2px); }
+        .hero-scroll {
+            position: absolute; bottom: 2.5rem;
+            animation: bounce 2s infinite;
+            color: rgba(255,255,255,.35); font-size: 1.5rem;
+        }
+        @keyframes bounce {
+            0%,100% { transform: translateY(0); }
+            50% { transform: translateY(8px); }
+        }
+
+        /* ── SECTIONS ── */
+        .section { padding: 6rem 1.5rem; }
+        .section-white { background: #fff; }
+        .section-gray { background: #F7F8FA; }
+        .section-dark { background: #1A1A2E; color: #fff; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section-label {
+            display: inline-block; font-size: .75rem; font-weight: 700;
+            letter-spacing: .08em; text-transform: uppercase;
+            color: #C1FF00; background: rgba(193,255,0,.1);
+            padding: .35rem .9rem; border-radius: 50px; margin-bottom: 1rem;
+        }
+        .section-dark .section-label { background: rgba(193,255,0,.15); }
+        .section-title {
+            font-size: clamp(1.8rem, 3.5vw, 2.6rem); font-weight: 800;
+            letter-spacing: -.02em; line-height: 1.15; margin-bottom: 1rem;
+        }
+        .section-subtitle { font-size: 1.1rem; color: #6B7280; max-width: 640px; line-height: 1.7; }
+        .section-dark .section-subtitle { color: rgba(255,255,255,.55); }
+
+        /* ── PROBLEM CARDS ── */
+        .problem-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.8rem; margin-top: 3rem; }
+        .problem-card {
+            background: #F7F8FA; border-radius: 1rem; padding: 2.2rem;
+            border: 1px solid #E5E7EB; transition: transform .2s, box-shadow .2s;
+        }
+        .problem-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,.06); }
+        .problem-icon {
+            width: 56px; height: 56px; border-radius: .75rem;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; margin-bottom: 1.4rem;
+            background: #FEE2E2; color: #DC2626;
+        }
+        .problem-card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: .6rem; }
+        .problem-card p { font-size: .95rem; color: #6B7280; line-height: 1.65; }
+
+        /* ── STEPS ── */
+        .steps-flow { display: flex; align-items: flex-start; gap: 0; margin-top: 3rem; flex-wrap: wrap; justify-content: center; }
+        .step-item { flex: 1; min-width: 220px; max-width: 280px; text-align: center; padding: 0 .8rem; position: relative; }
+        .step-num {
+            width: 52px; height: 52px; border-radius: 50%; margin: 0 auto 1.2rem;
+            display: flex; align-items: center; justify-content: center;
+            background: #C1FF00; color: #1A1A2E; font-weight: 800; font-size: 1.15rem;
+        }
+        .step-item h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: .5rem; color: #1F2937; }
+        .step-item p { font-size: .9rem; color: #6B7280; line-height: 1.6; }
+        .step-arrow {
+            display: flex; align-items: center; padding-top: 1.2rem;
+            color: #C1FF00; font-size: 1.5rem;
+        }
+        @media (max-width: 860px) {
+            .step-arrow { display: none; }
+            .steps-flow { flex-direction: column; align-items: center; gap: 2rem; }
+        }
+
+        /* ── STATS ── */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem; margin-top: 3rem; }
+        .stat-block { text-align: center; padding: 2rem 1rem; }
+        .stat-num { font-size: clamp(2.5rem, 5vw, 3.5rem); font-weight: 900; color: #C1FF00; line-height: 1; margin-bottom: .5rem; }
+        .stat-label { font-size: .95rem; color: rgba(255,255,255,.6); }
+
+        /* ── SCOPE CARDS ── */
+        .scope-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-top: 3rem; }
+        .scope-card {
+            background: #F7F8FA; border-radius: 1rem; padding: 2rem;
+            border: 1px solid #E5E7EB; transition: transform .2s, box-shadow .2s;
+        }
+        .scope-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,.06); }
+        .scope-icon {
+            width: 52px; height: 52px; border-radius: .75rem;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem; margin-bottom: 1.2rem;
+            background: rgba(193,255,0,.15); color: #1A1A2E;
+        }
+        .scope-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: .35rem; }
+        .scope-card p { font-size: .9rem; color: #6B7280; }
+
+        /* ── FOOTER CTA ── */
+        .footer-cta {
+            background: #C1FF00; padding: 5rem 1.5rem; text-align: center;
+        }
+        .footer-cta h2 {
+            font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800;
+            color: #1A1A2E; margin-bottom: .8rem; letter-spacing: -.02em;
+        }
+        .footer-cta p { font-size: 1.05rem; color: #1A1A2E; opacity: .7; margin-bottom: 2rem; }
+        .btn-dark {
+            padding: .85rem 2.4rem; border-radius: .6rem; font-weight: 700; font-size: 1rem;
+            background: #1A1A2E; color: #fff; transition: transform .15s, box-shadow .2s;
+            display: inline-flex; align-items: center; gap: .5rem;
+        }
+        .btn-dark:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(26,26,46,.25); }
+
+        /* ── FOOTER ── */
+        .footer {
+            background: #111122; padding: 2rem 1.5rem; text-align: center;
+            font-size: .85rem; color: rgba(255,255,255,.35);
+        }
+
+        /* ── ANIMATIONS ── */
+        .fade-up {
+            opacity: 0; transform: translateY(30px);
+            transition: opacity .7s ease, transform .7s ease;
+        }
+        .fade-up.visible { opacity: 1; transform: translateY(0); }
+
+        /* ── MOBILE NAV ── */
+        @media (max-width: 640px) {
+            .nav { padding: 1rem 1.2rem; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+    <a href="/" class="nav-logo">Subsidy<span>AI</span></a>
+    <div class="nav-links">
+        <a href="#problem">Проблема</a>
+        <a href="#solution">Решение</a>
+        <a href="#stats">Статистика</a>
+        <a href="#scope">Охват</a>
+    </div>
+    <a href="/auth/login/" class="nav-cta">Войти</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+    <div class="hero-badge"><i class="fas fa-bolt"></i> AI-Powered Subsidy Scoring</div>
+    <h1>Subsidy<span>AI</span></h1>
+    <p>Интеллектуальная система скоринга сельскохозяйственных субсидий Республики Казахстан</p>
+    <div class="hero-buttons">
+        <a href="/auth/login/" class="btn-lime"><i class="fas fa-right-to-bracket"></i> Войти в систему</a>
+        <a href="/dashboard/" class="btn-outline"><i class="fas fa-chart-line"></i> Открыть дашборд</a>
+    </div>
+    <a href="#problem" class="hero-scroll"><i class="fas fa-chevron-down"></i></a>
+</section>
+
+<!-- PROBLEM -->
+<section id="problem" class="section section-white">
+    <div class="container">
+        <div class="fade-up">
+            <span class="section-label">Проблема</span>
+            <h2 class="section-title">Распределение по очереди &mdash; несправедливо</h2>
+            <p class="section-subtitle">Действующая система субсидирования не учитывает качество заявки, создавая условия для злоупотреблений и неэффективного расхода бюджета.</p>
+        </div>
+        <div class="problem-grid">
+            <div class="problem-card fade-up">
+                <div class="problem-icon"><i class="fas fa-list-ol"></i></div>
+                <h3>Принцип FIFO</h3>
+                <p>Кто первый подал заявку &mdash; тот получил субсидию. Качество заявки не учитывается.</p>
+            </div>
+            <div class="problem-card fade-up">
+                <div class="problem-icon" style="background:#FEF3C7;color:#D97706;"><i class="fas fa-user-secret"></i></div>
+                <h3>Мошенничество</h3>
+                <p>Без автоматической проверки через госсистемы мошенники проходят наравне с добросовестными фермерами.</p>
+            </div>
+            <div class="problem-card fade-up">
+                <div class="problem-icon" style="background:#EDE9FE;color:#7C3AED;"><i class="fas fa-coins"></i></div>
+                <h3>Неэффективный бюджет</h3>
+                <p>Бюджет тратится на низкокачественные заявки, пока сильные фермеры стоят в очереди.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SOLUTION -->
+<section id="solution" class="section section-gray">
+    <div class="container">
+        <div class="fade-up" style="text-align:center;">
+            <span class="section-label">Решение</span>
+            <h2 class="section-title">AI-скоринг на основе данных</h2>
+            <p class="section-subtitle" style="margin:0 auto 1rem;">От подачи заявки до решения комиссии &mdash; каждый шаг прозрачен и обоснован данными.</p>
+        </div>
+        <div class="steps-flow fade-up">
+            <div class="step-item">
+                <div class="step-num">1</div>
+                <h3>Подача заявки</h3>
+                <p>Фермер заполняет данные через удобную форму</p>
+            </div>
+            <div class="step-arrow"><i class="fas fa-arrow-right"></i></div>
+            <div class="step-item">
+                <div class="step-num">2</div>
+                <h3>Проверка в 7 системах</h3>
+                <p>Автоматическая верификация через ГИСС, ИАС РСЖ, ЕГКН, ИС ЭСФ и др.</p>
+            </div>
+            <div class="step-arrow"><i class="fas fa-arrow-right"></i></div>
+            <div class="step-item">
+                <div class="step-num">3</div>
+                <h3>AI оценка по 8 факторам</h3>
+                <p>Скоринг от 0 до 100 баллов с объяснением каждого фактора</p>
+            </div>
+            <div class="step-arrow"><i class="fas fa-arrow-right"></i></div>
+            <div class="step-item">
+                <div class="step-num">4</div>
+                <h3>Комиссия решает</h3>
+                <p>Ранжированный список для прозрачного решения комиссии</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- STATS -->
+<section id="stats" class="section section-dark">
+    <div class="container" style="text-align:center;">
+        <div class="fade-up">
+            <span class="section-label">Масштаб</span>
+            <h2 class="section-title" style="color:#fff;">Система в цифрах</h2>
+        </div>
+        <div class="stats-grid fade-up">
+            <div class="stat-block">
+                <div class="stat-num">25</div>
+                <div class="stat-label">направлений субсидирования</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-num">114</div>
+                <div class="stat-label">видов субсидий</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-num">17</div>
+                <div class="stat-label">регионов Казахстана</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-num">7</div>
+                <div class="stat-label">государственных систем верификации</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SCOPE -->
+<section id="scope" class="section section-white">
+    <div class="container">
+        <div class="fade-up" style="text-align:center;">
+            <span class="section-label">Охват</span>
+            <h2 class="section-title">Весь сельскохозяйственный сектор</h2>
+            <p class="section-subtitle" style="margin:0 auto;">SubsidyAI охватывает все ключевые направления агропромышленного комплекса Казахстана.</p>
+        </div>
+        <div class="scope-grid fade-up">
+            <div class="scope-card">
+                <div class="scope-icon"><i class="fas fa-cow"></i></div>
+                <h3>Животноводство</h3>
+                <p>10 направлений</p>
+            </div>
+            <div class="scope-card">
+                <div class="scope-icon" style="background:rgba(34,197,94,.12);color:#16A34A;"><i class="fas fa-seedling"></i></div>
+                <h3>Растениеводство</h3>
+                <p>8 направлений</p>
+            </div>
+            <div class="scope-card">
+                <div class="scope-icon" style="background:rgba(59,130,246,.12);color:#2563EB;"><i class="fas fa-tractor"></i></div>
+                <h3>Ресурсы и техника</h3>
+                <p>4 направления</p>
+            </div>
+            <div class="scope-card">
+                <div class="scope-icon" style="background:rgba(168,85,247,.12);color:#9333EA;"><i class="fas fa-industry"></i></div>
+                <h3>Переработка и кооперация</h3>
+                <p>3 направления</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FOOTER CTA -->
+<section class="footer-cta">
+    <h2>Готовы к справедливому распределению субсидий?</h2>
+    <p>Присоединяйтесь к системе, которая ставит данные выше очереди.</p>
+    <a href="/auth/login/" class="btn-dark"><i class="fas fa-arrow-right"></i> Начать работу</a>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+    &copy; 2026 SubsidyAI &mdash; Министерство сельского хозяйства Республики Казахстан
+</footer>
+
+<script>
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+        }
+    });
+}, { threshold: 0.15 });
+document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

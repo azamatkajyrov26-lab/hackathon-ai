@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Дашборд — SubsidyAI{% endblock %}
+{% block page_title %}Дашборд{% endblock %}
+
+{% block content %}
+<div class="space-y-6 fade-in">
+
+    <!-- Stat Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- Всего заявок -->
+        <div class="card-glass p-6 slide-up" style="animation-delay: 0.05s">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#6B7280" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+            </div>
+            <p class="text-3xl font-bold text-gray-800">{{ stats.total }}</p>
+            <p class="text-xs text-gray-500 mt-1">Всего заявок</p>
+        </div>
+
+        <!-- На рассмотрении -->
+        <div class="card-glass p-6 slide-up" style="animation-delay: 0.1s">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#D97706" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+            <p class="text-3xl font-bold text-gray-800">{{ stats.pending }}</p>
+            <p class="text-xs text-gray-500 mt-1">На рассмотрении</p>
+        </div>
+
+        <!-- Одобрено -->
+        <div class="card-glass p-6 slide-up" style="animation-delay: 0.15s">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#059669" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <span class="badge-lime text-xs ml-auto">{{ stats.approved_pct }}%</span>
+            </div>
+            <p class="text-3xl font-bold text-gray-800">{{ stats.approved }}</p>
+            <p class="text-xs text-gray-500 mt-1">Одобрено</p>
+        </div>
+
+        <!-- Средний балл -->
+        <div class="card-glass p-6 slide-up" style="animation-delay: 0.2s">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#3B82F6" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                </div>
+            </div>
+            <p class="text-3xl font-bold text-gray-800">{{ stats.avg_score|floatformat:1 }}</p>
+            <p class="text-xs text-gray-500 mt-1">Средний балл</p>
+        </div>
+
+        <!-- Бюджет -->
+        <div class="card-glass p-6 slide-up" style="animation-delay: 0.25s">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-lime-400/10 flex items-center justify-center">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#5A7A00" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+            <p class="text-xl font-bold text-gray-800">{{ stats.budget_spent_display }}</p>
+            <p class="text-xs text-gray-500 mt-1 mb-2">из {{ stats.budget_total_display }} ({{ stats.year }})</p>
+            <div class="w-full bg-gray-100 rounded-full h-2">
+                <div class="h-2 rounded-full transition-all duration-500" style="width: {{ stats.budget_pct }}%; background: {% if stats.budget_pct > 90 %}#EF4444{% elif stats.budget_pct > 70 %}#F59E0B{% else %}#C1FF00{% endif %};"></div>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1 text-right">{{ stats.budget_pct }}%</p>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Score Distribution -->
+        <div class="card-glass p-6 slide-up" style="animation-delay: 0.3s">
+            <h3 class="text-sm font-semibold text-gray-800 mb-4">Распределение баллов</h3>
+            <div style="height: 280px;">
+                <canvas id="scoreChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Direction Distribution -->
+        <div class="card-glass p-6 slide-up" style="animation-delay: 0.35s">
+            <h3 class="text-sm font-semibold text-gray-800 mb-4">По направлениям</h3>
+            <div style="height: 280px;">
+                <canvas id="directionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Applicant History Summary (only for applicant role) -->
+    {% if applicant_history_summary %}
+    <div class="card-glass p-6 slide-up" style="animation-delay: 0.37s">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-gray-800"><i class="fas fa-clock-rotate-left mr-1 text-lime-500"></i> Ваша история</h3>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div class="bg-gray-50 rounded-xl p-4 text-center">
+                <p class="text-2xl font-bold text-gray-800">{{ applicant_history_summary.total_apps }}</p>
+                <p class="text-xs text-gray-500 mt-1">Всего заявок за все годы</p>
+            </div>
+            <div class="text-center bg-gray-50 rounded-xl p-4">
+                <p class="text-2xl font-bold {% if applicant_history_summary.success_rate >= 70 %}text-green-600{% elif applicant_history_summary.success_rate >= 40 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ applicant_history_summary.success_rate|floatformat:0 }}%</p>
+                <p class="text-xs text-gray-500 mt-1">Успешность заявок</p>
+            </div>
+            <div class="text-center bg-gray-50 rounded-xl p-4">
+                <p class="text-2xl font-bold text-green-600">{{ applicant_history_summary.total_amount|floatformat:0|intcomma }} ₸</p>
+                <p class="text-xs text-gray-500 mt-1">Общая сумма получено</p>
+            </div>
+        </div>
+        {% if applicant_history_summary.by_year %}
+        <div style="height: 160px;">
+            <canvas id="historyYearChart"></canvas>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Recent Applications Table -->
+    <div class="card-glass p-6 slide-up" style="animation-delay: 0.4s">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-gray-800">Последние заявки</h3>
+            <a href="/applications/" class="btn-ghost-custom text-xs py-2 px-3">Все заявки →</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="table-modern w-full">
+                <thead>
+                    <tr>
+                        <th class="text-left">#</th>
+                        <th class="text-left">Номер</th>
+                        <th class="text-left">Заявитель</th>
+                        <th class="text-left">Направление</th>
+                        <th class="text-center">Балл</th>
+                        <th class="text-center">Статус</th>
+                        <th class="text-right">Сумма</th>
+                        <th class="text-center"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for app in recent_applications %}
+                    <tr>
+                        <td class="text-gray-400 text-xs">{{ forloop.counter }}</td>
+                        <td class="font-medium">{{ app.number }}</td>
+                        <td>
+                            <div class="text-sm font-medium text-gray-800">{{ app.applicant.name }}</div>
+                            <div class="text-xs text-gray-400">{{ app.applicant.iin_bin }}</div>
+                        </td>
+                        <td class="text-sm">{{ app.subsidy_type.direction.name }}</td>
+                        <td class="text-center">
+                            {% if app.score %}
+                                <span class="font-bold text-sm {% if app.score.total_score >= 70 %}score-high{% elif app.score.total_score >= 40 %}score-mid{% else %}score-low{% endif %}">
+                                    {{ app.score.total_score }}
+                                </span>
+                            {% else %}
+                                <span class="text-gray-300">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if app.status == 'submitted' %}
+                                <span class="badge-info inline-block rounded-lg px-2.5 py-1 text-xs font-medium">Подана</span>
+                            {% elif app.status == 'checking' %}
+                                <span class="badge-warning inline-block rounded-lg px-2.5 py-1 text-xs font-medium">На проверке</span>
+                            {% elif app.status == 'approved' %}
+                                <span class="badge-success inline-block rounded-lg px-2.5 py-1 text-xs font-medium">Одобрена</span>
+                            {% elif app.status == 'rejected' %}
+                                <span class="badge-error inline-block rounded-lg px-2.5 py-1 text-xs font-medium">Отказ</span>
+                            {% elif app.status == 'paid' %}
+                                <span class="badge-lime inline-block rounded-lg px-2.5 py-1 text-xs font-medium">Выплачена</span>
+                            {% elif app.status == 'partially_paid' %}
+                                <span class="badge-lime inline-block rounded-lg px-2.5 py-1 text-xs font-medium">Частично выплачена</span>
+                            {% elif app.status == 'waiting_list' %}
+                                <span class="badge-warning inline-block rounded-lg px-2.5 py-1 text-xs font-medium">Лист ожидания</span>
+                            {% elif app.status == 'draft' %}
+                                <span class="inline-block rounded-lg px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-500">Черновик</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-right font-medium text-sm">{{ app.total_amount|floatformat:0|intcomma }} ₸</td>
+                        <td class="text-center">
+                            <a href="/applications/{{ app.id }}/" class="btn-ghost-custom text-xs py-1.5 px-3 inline-block">Открыть</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center text-gray-400 py-8">Заявки не найдены</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chartColors = {
+        primary: '#C1FF00',
+        secondary: '#1A1A2E',
+        success: '#10B981',
+        warning: '#F59E0B',
+        error: '#EF4444',
+        info: '#3B82F6'
+    };
+
+    // Score Distribution Bar Chart
+    const scoreData = JSON.parse('{{ score_distribution|escapejs }}');
+    if (scoreData && scoreData.labels) {
+        new Chart(document.getElementById('scoreChart'), {
+            type: 'bar',
+            data: {
+                labels: scoreData.labels,
+                datasets: [{
+                    label: 'Заявки',
+                    data: scoreData.values,
+                    backgroundColor: chartColors.primary,
+                    borderRadius: 8,
+                    borderSkipped: false,
+                    maxBarThickness: 48
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: chartColors.secondary,
+                        titleFont: { family: 'Inter', weight: '600' },
+                        bodyFont: { family: 'Inter' },
+                        padding: 12,
+                        cornerRadius: 10
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { family: 'Inter', size: 12, weight: '500' }, color: '#9CA3AF' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#F3F4F6' },
+                        ticks: {
+                            font: { family: 'Inter', size: 12 },
+                            color: '#9CA3AF',
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Direction Distribution Doughnut Chart
+    const dirData = JSON.parse('{{ direction_distribution|escapejs }}');
+    const doughnutColors = [
+        chartColors.primary, chartColors.secondary, chartColors.success,
+        chartColors.warning, chartColors.info, chartColors.error,
+        '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'
+    ];
+    if (dirData && dirData.labels) {
+        new Chart(document.getElementById('directionChart'), {
+            type: 'doughnut',
+            data: {
+                labels: dirData.labels,
+                datasets: [{
+                    data: dirData.values,
+                    backgroundColor: doughnutColors.slice(0, dirData.labels.length),
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            padding: 16,
+                            usePointStyle: true,
+                            pointStyleWidth: 10,
+                            font: { family: 'Inter', size: 12, weight: '500' },
+                            color: '#374151'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: chartColors.secondary,
+                        titleFont: { family: 'Inter', weight: '600' },
+                        bodyFont: { family: 'Inter' },
+                        padding: 12,
+                        cornerRadius: 10
+                    }
+                }
+            }
+        });
+    }
+
+    // Applicant History by Year Chart
+    {% if applicant_history_summary and applicant_history_summary.by_year %}
+    const histYearData = JSON.parse('{{ applicant_history_summary.by_year_json|escapejs }}');
+    if (histYearData && histYearData.labels && document.getElementById('historyYearChart')) {
+        new Chart(document.getElementById('historyYearChart'), {
+            type: 'bar',
+            data: {
+                labels: histYearData.labels,
+                datasets: [{
+                    label: 'Заявки',
+                    data: histYearData.values,
+                    backgroundColor: chartColors.primary,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    maxBarThickness: 40
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: chartColors.secondary,
+                        titleFont: { family: 'Inter', weight: '600' },
+                        bodyFont: { family: 'Inter' },
+                        padding: 10,
+                        cornerRadius: 8
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { family: 'Inter', size: 11 }, color: '#9CA3AF' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#F3F4F6' },
+                        ticks: { font: { family: 'Inter', size: 11 }, color: '#9CA3AF', stepSize: 1 }
+                    }
+                }
+            }
+        });
+    }
+    {% endif %}
+});
+</script>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}AI Модель — SubsidyAI{% endblock %}
+{% block page_title %}AI Модель скоринга{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in max-w-5xl mx-auto space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">AI Модель скоринга</h1>
+        <p class="text-sm text-gray-500 mt-1">Gradient Boosting — анализ сельхозпроизводителей</p>
+    </div>
+
+    {% if info %}
+    <!-- Model Metrics -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 slide-up">
+        <div class="card-glass p-5 text-center">
+            <p class="text-xs font-medium text-gray-500 uppercase">Обучающих примеров</p>
+            <p class="text-3xl font-bold text-gray-900 mt-1">{{ info.n_samples }}</p>
+        </div>
+        <div class="card-glass p-5 text-center">
+            <p class="text-xs font-medium text-gray-500 uppercase">R² (балл)</p>
+            <p class="text-3xl font-bold text-gray-900 mt-1">{{ info.score_r2 }}</p>
+            <p class="text-xs text-gray-400 mt-1">Качество предсказания балла</p>
+        </div>
+        <div class="card-glass p-5 text-center">
+            <p class="text-xs font-medium text-gray-500 uppercase">Accuracy (рекомендация)</p>
+            <p class="text-3xl font-bold text-gray-900 mt-1">{{ info.rec_accuracy }}</p>
+            <p class="text-xs text-gray-400 mt-1">Точность классификации</p>
+        </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="card-glass p-6 slide-up" style="animation-delay:0.05s;">
+        <h3 class="text-lg font-bold text-gray-900 mb-3"><i class="fas fa-brain text-lime-500 mr-2"></i>Как работает модель</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-600">
+            <div>
+                <h4 class="font-semibold text-gray-800 mb-2">1. Сбор данных</h4>
+                <p>Модель анализирует 20 показателей из 7 государственных информационных систем: ГИСС, ИАС РСЖ, ЕАСУ, ИС ИСЖ, ИС ЭСФ, ЕГКН, Казначейство.</p>
+            </div>
+            <div>
+                <h4 class="font-semibold text-gray-800 mb-2">2. Предсказание</h4>
+                <p>Gradient Boosting ансамбль (200 деревьев) вычисляет итоговый балл и рекомендацию. Гибридная модель: 60% AI + 40% экспертные правила.</p>
+            </div>
+            <div>
+                <h4 class="font-semibold text-gray-800 mb-2">3. Объяснимость</h4>
+                <p>Для каждой заявки формируется отчёт: какие факторы повлияли на решение AI, с указанием процента вклада каждого фактора.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feature Importances -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="card-glass p-5 slide-up" style="animation-delay:0.1s;">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3"><i class="fas fa-sort-amount-down text-blue-500 mr-1"></i> Топ факторы (балл)</h3>
+            <div class="space-y-3">
+                {% for f in info.top_features_score %}
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-700">{{ f.feature_ru }}</span>
+                        <span class="font-mono text-gray-500">{{ f.importance|floatformat:3 }}</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-2">
+                        <div class="h-2 rounded-full" style="width: {% widthratio f.importance 0.5 100 %}%; background: linear-gradient(90deg, #C1FF00, #059669);"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="card-glass p-5 slide-up" style="animation-delay:0.15s;">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3"><i class="fas fa-tags text-purple-500 mr-1"></i> Топ факторы (рекомендация)</h3>
+            <div class="space-y-3">
+                {% for f in info.top_features_rec %}
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-700">{{ f.feature_ru }}</span>
+                        <span class="font-mono text-gray-500">{{ f.importance|floatformat:3 }}</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-2">
+                        <div class="h-2 rounded-full" style="width: {% widthratio f.importance 0.5 100 %}%; background: linear-gradient(90deg, #818CF8, #6D28D9);"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- All Features -->
+    <div class="card-glass p-5 slide-up" style="animation-delay:0.2s;">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3"><i class="fas fa-list text-gray-500 mr-1"></i> Все 20 признаков модели</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-sm">
+            {% for name in info.feature_names %}
+            <div class="flex items-center gap-2 py-1 border-b border-gray-50">
+                <span class="w-5 h-5 rounded bg-lime-100 text-lime-700 text-xs flex items-center justify-center font-bold">{{ forloop.counter }}</span>
+                <span class="text-gray-700">{{ name }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% else %}
+    <div class="card-glass p-8 text-center">
+        <i class="fas fa-robot text-4xl text-gray-300 mb-3"></i>
+        <p class="text-gray-500">Модель ещё не обучена.</p>
+        <p class="text-sm text-gray-400 mt-2">Запустите: <code class="bg-gray-100 px-2 py-0.5 rounded font-mono text-xs">python manage.py train_model</code></p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

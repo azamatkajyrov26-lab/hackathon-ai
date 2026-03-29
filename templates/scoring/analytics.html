@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Аналитика — SubsidyAI{% endblock %}
+{% block page_title %}Аналитика{% endblock %}
+
+{% block content %}
+<div class="space-y-6 fade-in">
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- Всего заявок -->
+        <div class="card-glass p-6 slide-up" style="animation-delay: 0.05s">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#6B7280" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+            </div>
+            <p class="text-3xl font-bold text-gray-800">{{ total }}</p>
+            <p class="text-xs text-gray-500 mt-1">Всего заявок</p>
+        </div>
+
+        <!-- Средний балл AI -->
+        <div class="card-glass p-6 slide-up" style="animation-delay: 0.1s">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#3B82F6" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                </div>
+            </div>
+            <p class="text-3xl font-bold text-gray-800">{{ avg_score|floatformat:1 }}</p>
+            <p class="text-xs text-gray-500 mt-1">Средний балл AI</p>
+        </div>
+
+        <!-- Статусы -->
+        <div class="card-glass p-6 slide-up" style="animation-delay: 0.15s">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-lime-400/10 flex items-center justify-center">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#5A7A00" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                </div>
+            </div>
+            <p class="text-sm font-semibold text-gray-800 mb-2">Статусы</p>
+            <div class="space-y-1.5">
+                {% for label, count in by_status.items %}
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-gray-500">{{ label }}</span>
+                    <span class="font-semibold text-gray-700">{{ count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Score Distribution -->
+        <div class="card-glass p-6 slide-up" style="animation-delay: 0.2s">
+            <h3 class="text-sm font-semibold text-gray-800 mb-4">Распределение баллов</h3>
+            <div style="height: 320px;">
+                <canvas id="scoreChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Regional Distribution -->
+        <div class="card-glass p-6 slide-up" style="animation-delay: 0.25s">
+            <h3 class="text-sm font-semibold text-gray-800 mb-4">По регионам</h3>
+            <div style="height: 320px;">
+                <canvas id="regionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Regional Breakdown Table -->
+    <div class="card-glass p-6 slide-up" style="animation-delay: 0.3s">
+        <h3 class="text-sm font-semibold text-gray-800 mb-4">Разбивка по регионам</h3>
+        <div class="overflow-x-auto">
+            <table class="table-modern w-full">
+                <thead>
+                    <tr>
+                        <th class="text-left">Регион</th>
+                        <th class="text-center">Заявки</th>
+                        <th class="text-right">Общая сумма</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in by_region %}
+                    <tr>
+                        <td class="font-medium text-sm">{{ row.region }}</td>
+                        <td class="text-center">
+                            <span class="badge-lime inline-block">{{ row.count }}</span>
+                        </td>
+                        <td class="text-right font-medium text-sm">{{ row.total|floatformat:0|intcomma }} ₸</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center text-gray-400 py-8">Нет данных</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chartColors = {
+        primary: '#C1FF00',
+        secondary: '#1A1A2E',
+        success: '#10B981',
+        warning: '#F59E0B',
+        error: '#EF4444',
+        info: '#3B82F6'
+    };
+
+    // Score Distribution Bar Chart
+    const scoreData = JSON.parse('{{ score_chart|escapejs }}');
+    if (scoreData && scoreData.labels) {
+        new Chart(document.getElementById('scoreChart'), {
+            type: 'bar',
+            data: {
+                labels: scoreData.labels,
+                datasets: [{
+                    label: 'Заявки',
+                    data: scoreData.values,
+                    backgroundColor: chartColors.primary,
+                    borderRadius: 8,
+                    borderSkipped: false,
+                    maxBarThickness: 48
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: chartColors.secondary,
+                        titleFont: { family: 'Inter', weight: '600' },
+                        bodyFont: { family: 'Inter' },
+                        padding: 12,
+                        cornerRadius: 10
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { family: 'Inter', size: 12, weight: '500' }, color: '#9CA3AF' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#F3F4F6' },
+                        ticks: {
+                            font: { family: 'Inter', size: 12 },
+                            color: '#9CA3AF',
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Regional Distribution Horizontal Bar Chart
+    const regionData = JSON.parse('{{ region_chart|escapejs }}');
+    const barColors = [
+        chartColors.primary, chartColors.success, chartColors.info,
+        chartColors.warning, '#8B5CF6', '#EC4899',
+        '#14B8A6', '#F97316', chartColors.error, chartColors.secondary
+    ];
+    if (regionData && regionData.labels) {
+        const regionColors = regionData.labels.map(function(_, i) { return barColors[i % barColors.length]; });
+        new Chart(document.getElementById('regionChart'), {
+            type: 'bar',
+            data: {
+                labels: regionData.labels,
+                datasets: [{
+                    label: 'Заявки',
+                    data: regionData.values,
+                    backgroundColor: regionColors,
+                    borderRadius: 8,
+                    borderSkipped: false,
+                    maxBarThickness: 28
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: chartColors.secondary,
+                        titleFont: { family: 'Inter', weight: '600' },
+                        bodyFont: { family: 'Inter' },
+                        padding: 12,
+                        cornerRadius: 10
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: { color: '#F3F4F6' },
+                        ticks: {
+                            font: { family: 'Inter', size: 12 },
+                            color: '#9CA3AF',
+                            stepSize: 1
+                        }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: {
+                            font: { family: 'Inter', size: 12, weight: '500' },
+                            color: '#374151'
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,1599 @@
+{% extends "base.html" %}
+{% load l10n %}
+{% block title %}Подать заявку — SubsidyAI{% endblock %}
+{% block page_title %}Новая заявка на субсидию{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+[x-cloak] { display: none !important; }
+
+/* Flow step animations */
+.flow-step {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 0;
+    overflow: hidden;
+    margin-bottom: 0;
+}
+.flow-step.visible {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 2000px;
+    margin-bottom: 16px;
+}
+.flow-step.collapsed {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 120px;
+    margin-bottom: 16px;
+}
+
+/* Summary card for completed steps */
+.completed-summary {
+    background: linear-gradient(135deg, #F7FFF0 0%, #FAFFF5 100%);
+    border: 1.5px solid rgba(193,255,0,0.3);
+    border-radius: 14px;
+    padding: 14px 20px;
+    cursor: pointer;
+    transition: all 0.25s;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.completed-summary:hover { border-color: #C1FF00; box-shadow: 0 2px 12px rgba(193,255,0,0.15); }
+.completed-summary .check-icon {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #C1FF00; color: #1A1A2E;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; flex-shrink: 0;
+}
+.completed-summary .step-info { flex: 1; min-width: 0; }
+.completed-summary .step-label { font-size: 11px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.completed-summary .step-value { font-size: 14px; color: #1F2937; font-weight: 600; margin-top: 1px; }
+.completed-summary .edit-btn { color: #9CA3AF; font-size: 12px; transition: color 0.2s; }
+.completed-summary:hover .edit-btn { color: #C1FF00; }
+
+/* Active step card */
+.active-card {
+    background: #fff;
+    border: 1.5px solid #E5E7EB;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.active-card.highlight { border-color: #C1FF00; box-shadow: 0 4px 20px rgba(193,255,0,0.12); }
+
+/* Step number bubble */
+.step-bubble {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px; flex-shrink: 0;
+    transition: all 0.3s;
+}
+.step-bubble.active { background: #C1FF00; color: #1A1A2E; }
+.step-bubble.pending { background: #F3F4F6; color: #9CA3AF; }
+
+/* Direction cards */
+.dir-card {
+    border: 2px solid #E5E7EB;
+    border-radius: 14px;
+    padding: 16px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    background: #fff;
+}
+.dir-card:hover { border-color: #C1FF00; background: #FAFFF0; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+.dir-card.selected { border-color: #C1FF00; background: #F0FFD0; box-shadow: 0 0 0 3px rgba(193,255,0,0.2); }
+.dir-card .dir-emoji { font-size: 28px; display: block; margin-bottom: 6px; }
+.dir-card .dir-name { font-size: 12px; font-weight: 600; color: #374151; line-height: 1.3; }
+
+/* Category tabs */
+.cat-tab {
+    padding: 8px 18px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; border: 1.5px solid transparent;
+    background: #F3F4F6; color: #6B7280;
+}
+.cat-tab:hover { background: #E5E7EB; }
+.cat-tab.active { background: #1A1A2E; color: #C1FF00; border-color: #1A1A2E; }
+
+/* Subsidy type option */
+.stype-option {
+    border: 1.5px solid #E5E7EB;
+    border-radius: 12px;
+    padding: 14px 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: #fff;
+}
+.stype-option:hover { border-color: #C1FF00; background: #FAFFF5; }
+.stype-option.selected { border-color: #C1FF00; background: #F0FFD0; }
+
+/* Map container */
+#kz-map {
+    width: 100%;
+    height: 300px;
+    border-radius: 12px;
+    border: 1.5px solid #E5E7EB;
+    z-index: 1;
+}
+
+/* Quantity stepper */
+.qty-stepper {
+    display: flex; align-items: center; gap: 0;
+    border: 1.5px solid #E5E7EB; border-radius: 12px; overflow: hidden;
+    background: #fff;
+}
+.qty-stepper button {
+    width: 44px; height: 44px; border: none; background: #F9FAFB;
+    font-size: 18px; cursor: pointer; color: #374151; transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center;
+}
+.qty-stepper button:hover { background: #C1FF00; color: #1A1A2E; }
+.qty-stepper input {
+    width: 80px; text-align: center; border: none; font-size: 16px; font-weight: 600;
+    outline: none; background: transparent; padding: 10px 0;
+}
+
+/* Application name badge */
+.app-name-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #1A1A2E; color: #C1FF00; border-radius: 10px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600;
+    font-family: 'Courier New', monospace;
+}
+
+/* Total summary */
+.total-card {
+    background: linear-gradient(135deg, #1A1A2E 0%, #2A2A4E 100%);
+    border-radius: 16px;
+    padding: 24px 28px;
+    color: #fff;
+}
+.total-card .total-label { font-size: 12px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; }
+.total-card .total-value { font-size: 28px; font-weight: 800; color: #C1FF00; margin-top: 4px; }
+
+/* Confirmation checkbox */
+.confirm-box {
+    display: flex; align-items: flex-start; gap: 12px;
+    background: #FFFDF0; border: 1.5px solid #FDE68A; border-radius: 12px;
+    padding: 16px 20px; cursor: pointer;
+}
+.confirm-box input[type="checkbox"] {
+    width: 20px; height: 20px; accent-color: #C1FF00; margin-top: 2px; flex-shrink: 0;
+}
+
+/* Progress line */
+.progress-line {
+    position: absolute; left: 17px; top: 0; bottom: 0; width: 2px;
+    background: #E5E7EB; z-index: 0;
+}
+.progress-line-fill {
+    position: absolute; left: 17px; top: 0; width: 2px;
+    background: #C1FF00; z-index: 1;
+    transition: height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Draft button */
+.draft-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #F3F4F6; color: #6B7280; border: 1.5px solid #E5E7EB;
+    border-radius: 10px; padding: 8px 16px; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s;
+}
+.draft-btn:hover { border-color: #C1FF00; color: #1A1A2E; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .active-card { padding: 16px 12px; }
+    #kz-map { height: 200px; }
+    .dir-card { padding: 10px 8px; }
+    .dir-card .dir-emoji { font-size: 20px; margin-bottom: 4px; }
+    .dir-card .dir-name { font-size: 10px; }
+    .cat-tab { padding: 6px 12px; font-size: 12px; }
+    .completed-summary { padding: 10px 14px; gap: 10px; }
+    .completed-summary .check-icon { width: 24px; height: 24px; font-size: 11px; }
+    .completed-summary .step-label { font-size: 10px; }
+    .completed-summary .step-value { font-size: 13px; }
+    .stype-option { padding: 10px 12px; gap: 10px; }
+    .total-card { padding: 16px 18px; }
+    .total-card .total-value { font-size: 22px; }
+    .app-name-badge { font-size: 11px; padding: 6px 12px; }
+    .qty-stepper button { width: 38px; height: 38px; }
+    .qty-stepper input { width: 60px; font-size: 14px; }
+    .confirm-box { padding: 12px 14px; }
+    .draft-btn { padding: 6px 12px; font-size: 12px; }
+    .progress-line, .progress-line-fill { display: none; }
+}
+@media (max-width: 400px) {
+    .active-card { padding: 12px 10px; border-radius: 12px; }
+    h1.text-2xl { font-size: 1.25rem; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-cloak x-data="applicationFlow()" class="max-w-3xl mx-auto">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 fade-in">
+        <div>
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Новая заявка</h1>
+            <p class="text-xs sm:text-sm text-gray-500 mt-1">Заполняйте поэтапно — каждый шаг появится автоматически</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button type="button" class="draft-btn" @click="saveDraft()" x-show="currentStep > 1">
+                <i class="fas fa-save"></i> <span class="hidden sm:inline">Черновик</span>
+            </button>
+            <a href="/applications/" class="draft-btn"><i class="fas fa-arrow-left"></i> <span class="hidden sm:inline">Назад</span></a>
+        </div>
+    </div>
+
+    <!-- Auto-generated name -->
+    <div class="mb-5 fade-in" x-show="appName" x-transition>
+        <div class="app-name-badge">
+            <i class="fas fa-tag"></i>
+            <span x-text="appName"></span>
+        </div>
+    </div>
+
+    <form method="post" action="/applications/new/" @submit="submitting = true; clearProgress()" id="appForm" enctype="multipart/form-data">
+        {% csrf_token %}
+        <!-- Persistent hidden inputs (always in DOM regardless of current step) -->
+        <input type="hidden" name="subsidy_type" :value="subsidyType">
+        <input type="hidden" name="iin_bin" :value="iinBin">
+        <input type="hidden" name="name" :value="applicantName">
+        <input type="hidden" name="entity_type" :value="entityType">
+        <input type="hidden" name="region" :value="region">
+        <input type="hidden" name="district" :value="district">
+        <input type="hidden" name="quantity" :value="quantity">
+        <input type="hidden" name="esf_number" :value="esfNumber">
+        <input type="hidden" name="phone" :value="phone">
+        <input type="hidden" name="bank_account" :value="bankAccount">
+        <input type="hidden" name="selected_animals" :value="JSON.stringify(selectedAnimals.map(function(i){ return allAnimals[i] || null; }).filter(Boolean))">
+        <input type="hidden" name="selected_plots" :value="JSON.stringify(selectedPlots.map(function(i){ return allPlots[i] || null; }).filter(Boolean))">
+        <input type="hidden" name="selected_invoices" :value="JSON.stringify(selectedInvoices.map(function(i){ return allInvoices[i] || null; }).filter(Boolean))">
+        <input type="hidden" name="ecp_signed" :value="ecpSigned ? 'true' : 'false'">
+        <!-- Farm indicator hidden inputs -->
+        <input type="hidden" name="farm_gross_prod_prev" :value="farm.grossProdPrev">
+        <input type="hidden" name="farm_gross_prod_before" :value="farm.grossProdBefore">
+        <input type="hidden" name="farm_growth_rate" :value="farm.growthRate">
+        <input type="hidden" name="farm_obligations_met" :value="farm.obligationsMet ? '1' : '0'">
+        <input type="hidden" name="farm_land_area" :value="farm.landArea">
+        <input type="hidden" name="farm_land_plots" :value="farm.landPlots">
+        <input type="hidden" name="farm_verified_animals" :value="farm.verifiedAnimals">
+        <input type="hidden" name="farm_rejected_animals" :value="farm.rejectedAnimals">
+        <input type="hidden" name="farm_subsidy_count" :value="farm.subsidyCount">
+        <input type="hidden" name="farm_subsidy_success" :value="farm.subsidySuccess">
+        <input type="hidden" name="farm_pending_returns" :value="farm.pendingReturns">
+        <input type="hidden" name="farm_esf_total" :value="farm.esfTotal">
+        <input type="hidden" name="farm_esf_count" :value="farm.esfCount">
+        <input type="hidden" name="farm_total_subsidies_received" :value="farm.totalSubsidiesReceived">
+
+        <!-- ===================== STEP 1: Category ===================== -->
+        <div class="mb-4" :class="stepClass(1)">
+            <template x-if="currentStep > 1">
+                <div class="completed-summary" @click="goToStep(1)">
+                    <div class="check-icon"><i class="fas fa-check"></i></div>
+                    <div class="step-info">
+                        <div class="step-label">Категория</div>
+                        <div class="step-value" x-text="categoryLabels[category] || ''"></div>
+                    </div>
+                    <div class="edit-btn"><i class="fas fa-pen"></i> Изменить</div>
+                </div>
+            </template>
+            <template x-if="currentStep === 1">
+                <div class="active-card highlight step-section">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="step-bubble active">1</div>
+                        <div>
+                            <h2 class="font-bold text-lg text-gray-900">Выберите категорию</h2>
+                            <p class="text-sm text-gray-500">К какой отрасли относится ваша деятельность?</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="(label, key) in categoryLabels" :key="key">
+                            <button type="button" class="cat-tab"
+                                :class="category === key ? 'active' : ''"
+                                @click="category = key; currentStep = 2; updateAppName(); saveProgress()">
+                                <span x-text="label"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===================== STEP 2: Direction ===================== -->
+        <div class="mb-4" :class="stepClass(2)">
+            <template x-if="currentStep > 2">
+                <div class="completed-summary" @click="goToStep(2)">
+                    <div class="check-icon"><i class="fas fa-check"></i></div>
+                    <div class="step-info">
+                        <div class="step-label">Направление</div>
+                        <div class="step-value" x-text="getDirectionName()"></div>
+                    </div>
+                    <div class="edit-btn"><i class="fas fa-pen"></i> Изменить</div>
+                </div>
+            </template>
+            <template x-if="currentStep === 2">
+                <div class="active-card highlight step-section">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="step-bubble active">2</div>
+                        <div>
+                            <h2 class="font-bold text-lg text-gray-900">Направление субсидирования</h2>
+                            <p class="text-sm text-gray-500">Выберите конкретное направление</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
+                        {% for d in directions %}
+                        <div class="dir-card"
+                             x-show="dirCat['{{ d.code }}'] === category"
+                             :class="direction === '{{ d.code }}' ? 'selected' : ''"
+                             @click="direction = '{{ d.code }}'; doFilter(); currentStep = 3; updateAppName(); saveProgress()">
+                            <span class="dir-emoji">{% if d.code == 'cattle_meat' %}🐄{% elif d.code == 'cattle_dairy' %}🍼{% elif d.code == 'cattle_general' %}🐂{% elif d.code == 'sheep' %}🐑{% elif d.code == 'poultry' %}🐔{% elif d.code == 'horse' %}🐎{% elif d.code == 'pig' %}🐖{% elif d.code == 'camel' %}🐪{% elif d.code == 'beekeeping' %}🐝{% elif d.code == 'aquaculture' %}🐟{% elif d.code == 'crops_grain' %}🌾{% elif d.code == 'crops_oilseed' %}🌻{% elif d.code == 'crops_cotton' %}☁️{% elif d.code == 'crops_sugar' %}🍬{% elif d.code == 'crops_vegetables' %}🥦{% elif d.code == 'crops_fruit' %}🍎{% elif d.code == 'crops_fodder' %}🌿{% elif d.code == 'seed_production' %}🌱{% elif d.code == 'fertilizers' %}🧪{% elif d.code == 'fuel' %}⛽{% elif d.code == 'water' %}💧{% elif d.code == 'equipment' %}🚜{% elif d.code == 'processing' %}🏭{% elif d.code == 'cooperation' %}🤝{% elif d.code == 'insurance' %}🛡️{% else %}📋{% endif %}</span>
+                            <span class="dir-name">{{ d.name }}</span>
+                            <input type="radio" name="direction" value="{{ d.code }}" class="hidden" :checked="direction === '{{ d.code }}'">
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="flex justify-start mt-4">
+                        <button type="button" class="draft-btn" @click="goToStep(1)"><i class="fas fa-arrow-left"></i> Назад</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===================== STEP 3: Subsidy Type ===================== -->
+        <div class="mb-4" :class="stepClass(3)">
+            <template x-if="currentStep > 3">
+                <div class="completed-summary" @click="goToStep(3)">
+                    <div class="check-icon"><i class="fas fa-check"></i></div>
+                    <div class="step-info">
+                        <div class="step-label">Вид субсидии</div>
+                        <div class="step-value" x-text="selectedTypeName"></div>
+                    </div>
+                    <div class="edit-btn"><i class="fas fa-pen"></i> Изменить</div>
+                </div>
+            </template>
+            <template x-if="currentStep === 3">
+                <div class="active-card highlight step-section">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="step-bubble active">3</div>
+                        <div>
+                            <h2 class="font-bold text-lg text-gray-900">Вид субсидии</h2>
+                            <p class="text-sm text-gray-500">Направление: <span class="font-semibold text-gray-800" x-text="getDirectionName()"></span></p>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <template x-for="st in filteredTypes" :key="st.id">
+                            <div class="stype-option"
+                                 :class="subsidyType == st.id ? 'selected' : ''"
+                                 @click="subsidyType = st.id; doRate(); currentStep = 4; updateAppName(); saveProgress()">
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-semibold text-sm text-gray-900" x-text="st.name"></p>
+                                    <p class="text-xs text-gray-500 mt-0.5" x-text="'Форма ' + st.form + (st.originLabel ? ' · ' + st.originLabel : '')"></p>
+                                </div>
+                                <div class="text-right shrink-0">
+                                    <p class="font-bold text-sm" style="color: #5A7A00" x-text="Number(st.rate).toLocaleString('ru-RU') + ' ₸'"></p>
+                                    <p class="text-xs text-gray-400" x-text="'за ' + st.unit"></p>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <input type="hidden" name="subsidy_type" :value="subsidyType">
+                    <div class="flex justify-start mt-4">
+                        <button type="button" class="draft-btn" @click="goToStep(2)"><i class="fas fa-arrow-left"></i> Назад</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===================== STEP 4: Region (Map) ===================== -->
+        <div class="mb-4" :class="stepClass(4)">
+            <template x-if="currentStep > 4">
+                <div class="completed-summary" @click="goToStep(4)">
+                    <div class="check-icon"><i class="fas fa-check"></i></div>
+                    <div class="step-info">
+                        <div class="step-label">Регион</div>
+                        <div class="step-value" x-text="region + (district ? ', ' + district : '')"></div>
+                    </div>
+                    <div class="edit-btn"><i class="fas fa-pen"></i> Изменить</div>
+                </div>
+            </template>
+            <template x-if="currentStep === 4">
+                <div class="active-card highlight step-section">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="step-bubble active">4</div>
+                        <div>
+                            <h2 class="font-bold text-lg text-gray-900">Регион</h2>
+                            <p class="text-sm text-gray-500">Выберите на карте или из списка</p>
+                        </div>
+                    </div>
+
+                    <!-- Map -->
+                    <div id="kz-map" class="mb-4" x-init="$nextTick(() => initMap())"></div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Область *</label>
+                            <select name="region" x-model="region" class="w-full" required
+                                    @change="updateMapSelection(); if(region) { $refs.districtInput.focus() }">
+                                <option value="">— Выберите область —</option>
+                                {% for r in regions %}
+                                <option value="{{ r }}">{{ r }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Район</label>
+                            <input type="text" name="district" x-model="district" x-ref="districtInput"
+                                   placeholder="Напр. Целиноградский район" class="w-full">
+                        </div>
+                    </div>
+                    <div class="flex justify-between mt-5">
+                        <button type="button" class="draft-btn" @click="goToStep(3)"><i class="fas fa-arrow-left"></i> Назад</button>
+                        <button type="button" class="btn-lime" :disabled="!region"
+                                @click="currentStep = 5; updateAppName(); saveProgress()">Далее <i class="fas fa-arrow-right ml-1"></i></button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===================== STEP 5: Applicant ===================== -->
+        <div class="mb-4" :class="stepClass(5)">
+            <template x-if="currentStep > 5">
+                <div class="completed-summary" @click="goToStep(5)">
+                    <div class="check-icon"><i class="fas fa-check"></i></div>
+                    <div class="step-info">
+                        <div class="step-label">Заявитель</div>
+                        <div class="step-value" x-text="applicantName + ' (' + iinBin + ')'"></div>
+                    </div>
+                    <div class="edit-btn"><i class="fas fa-pen"></i> Изменить</div>
+                </div>
+            </template>
+            <template x-if="currentStep === 5">
+                <div class="active-card highlight step-section">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="step-bubble active">5</div>
+                        <div>
+                            <h2 class="font-bold text-lg text-gray-900">Данные заявителя</h2>
+                            <p class="text-sm text-gray-500">Укажите данные организации или ИП</p>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">ИИН / БИН *</label>
+                                <input type="text" name="iin_bin" x-model="iinBin" maxlength="12"
+                                       placeholder="123456789012" class="w-full" required
+                                       @input="iinBin = iinBin.replace(/\D/g, '')">
+                                <p class="text-xs text-red-500 mt-1" x-show="iinBin.length > 0 && iinBin.length !== 12">Должен содержать 12 цифр</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">ФИО / Наименование *</label>
+                                <input type="text" name="name" x-model="applicantName"
+                                       placeholder='ТОО "Агрофирма" или ИП Иванов' class="w-full" required>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Контактный телефон *</label>
+                                <input type="tel" x-model="phone" placeholder="+7 (7XX) XXX-XX-XX" class="w-full" required>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Тип субъекта *</label>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" class="cat-tab" :class="entityType === 'legal' ? 'active' : ''" @click="entityType = 'legal'">Юр. лицо (ТОО, АО)</button>
+                                <button type="button" class="cat-tab" :class="entityType === 'individual' ? 'active' : ''" @click="entityType = 'individual'">Физ. лицо (ИП, КХ)</button>
+                                <button type="button" class="cat-tab" :class="entityType === 'cooperative' ? 'active' : ''" @click="entityType = 'cooperative'">Кооператив (СПК)</button>
+                            </div>
+                            <input type="hidden" name="entity_type" :value="entityType">
+                        </div>
+                    </div>
+                    <div class="flex justify-between mt-5">
+                        <button type="button" class="draft-btn" @click="goToStep(4)"><i class="fas fa-arrow-left"></i> Назад</button>
+                        <button type="button" class="btn-lime"
+                                :disabled="!iinBin || iinBin.length !== 12 || !applicantName"
+                                @click="fetchEntityData()">
+                            <span x-show="!entityLoading">Далее <i class="fas fa-arrow-right ml-1"></i></span>
+                            <span x-show="entityLoading"><i class="fas fa-spinner fa-spin mr-1"></i> Загрузка данных...</span>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===================== STEP 6: Farm Indicators (from Emulator) ===================== -->
+        <div class="mb-4" :class="stepClass(6)">
+            <template x-if="currentStep > 6">
+                <div class="completed-summary" @click="goToStep(6)">
+                    <div class="check-icon"><i class="fas fa-check"></i></div>
+                    <div class="step-info">
+                        <div class="step-label">Показатели хозяйства</div>
+                        <div class="step-value">
+                            <span x-text="entityFound ? 'Данные из ' + entitySystemsCount + ' систем загружены' : 'Данные не найдены — заполнены вручную'"></span>
+                        </div>
+                    </div>
+                    <div class="edit-btn"><i class="fas fa-pen"></i> Изменить</div>
+                </div>
+            </template>
+            <template x-if="currentStep === 6">
+                <div class="active-card highlight step-section">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="step-bubble active">6</div>
+                        <div>
+                            <h2 class="font-bold text-lg text-gray-900">Показатели хозяйства</h2>
+                            <p class="text-sm text-gray-500">
+                                <template x-if="entityFound">
+                                    <span>Данные загружены из информационных систем. Проверьте и при необходимости отредактируйте.</span>
+                                </template>
+                                <template x-if="!entityFound">
+                                    <span class="text-amber-600">Данные по ИИН/БИН не найдены. Заполните показатели вручную.</span>
+                                </template>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Entity info banner -->
+                    <template x-if="entityFound">
+                        <div class="flex items-center gap-3 mb-4 p-3 rounded-xl" style="background: #F0FFD0; border: 1px solid rgba(193,255,0,0.3);">
+                            <div class="w-8 h-8 rounded-full bg-lime-400 flex items-center justify-center text-xs font-bold" style="color:#1A1A2E;">
+                                <i class="fas fa-database"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-semibold text-gray-800" x-text="entityName || applicantName"></p>
+                                <p class="text-xs text-gray-500">
+                                    <span x-text="entityRiskLabel"></span> ·
+                                    <a :href="'/emulator/' + entityId + '/'" target="_blank" class="text-lime-600 hover:underline">Открыть в эмуляторе →</a>
+                                </p>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Pre-checks (hard filter preview) -->
+                    <template x-if="entityFound && Object.keys(preChecks).length > 0">
+                        <div class="mb-4 rounded-xl border border-gray-100 p-4 bg-gray-50/50">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                <i class="fas fa-clipboard-check text-blue-500"></i> Предварительные проверки
+                            </h4>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                <div class="flex items-center gap-1.5 text-xs" :class="preChecks.giss_registered ? 'text-green-600' : 'text-red-600'">
+                                    <i :class="preChecks.giss_registered ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i> ГИСС
+                                </div>
+                                <div class="flex items-center gap-1.5 text-xs" :class="preChecks.ias_registered ? 'text-green-600' : 'text-red-600'">
+                                    <i :class="preChecks.ias_registered ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i> ИАС РСЖ
+                                </div>
+                                <div class="flex items-center gap-1.5 text-xs" :class="preChecks.has_eds ? 'text-green-600' : 'text-red-600'">
+                                    <i :class="preChecks.has_eds ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i> ЭЦП / ЕАСУ
+                                </div>
+                                <div class="flex items-center gap-1.5 text-xs" :class="preChecks.has_land ? 'text-green-600' : 'text-red-600'">
+                                    <i :class="preChecks.has_land ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i> Земля ЕГКН
+                                </div>
+                                <div class="flex items-center gap-1.5 text-xs" :class="preChecks.not_blocked ? 'text-green-600' : 'text-red-600'">
+                                    <i :class="preChecks.not_blocked ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i> Не заблокирован
+                                </div>
+                                <div class="flex items-center gap-1.5 text-xs" :class="preChecks.obligations_met ? 'text-green-600' : 'text-red-600'">
+                                    <i :class="preChecks.obligations_met ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i> Обязательства
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        <!-- ГИСС: Производство -->
+                        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <i class="fas fa-chart-line text-green-500"></i> Производство <span class="text-gray-300 font-normal">ГИСС</span>
+                            </h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Валовая продукция — предыдущий год (₸)</label>
+                                    <input type="number" x-model.number="farm.grossProdPrev" class="w-full text-sm" placeholder="0">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Валовая продукция — год ранее (₸)</label>
+                                    <input type="number" x-model.number="farm.grossProdBefore" class="w-full text-sm" placeholder="0">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Темп роста (%)</label>
+                                    <input type="number" step="0.1" x-model.number="farm.growthRate" class="w-full text-sm" placeholder="0">
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" x-model="farm.obligationsMet" id="fm_obl" class="rounded accent-lime-500">
+                                    <label for="fm_obl" class="text-xs text-gray-600">Встречные обязательства выполнены</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ЕГКН: Земельные ресурсы -->
+                        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <i class="fas fa-mountain text-amber-500"></i> Земельные ресурсы <span class="text-gray-300 font-normal">ЕГКН</span>
+                            </h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Общая с/х площадь (га)</label>
+                                    <input type="number" step="0.1" x-model.number="farm.landArea" class="w-full text-sm" placeholder="0">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Количество земельных участков</label>
+                                    <input type="number" x-model.number="farm.landPlots" class="w-full text-sm" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ИС ИСЖ: Поголовье -->
+                        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <i class="fas fa-horse text-blue-500"></i> Поголовье <span class="text-gray-300 font-normal">ИС ИСЖ</span>
+                            </h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Верифицированных голов</label>
+                                    <input type="number" x-model.number="farm.verifiedAnimals" class="w-full text-sm" placeholder="0">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Отклонённых голов</label>
+                                    <input type="number" x-model.number="farm.rejectedAnimals" class="w-full text-sm" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ИАС РСЖ: История субсидий -->
+                        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <i class="fas fa-hand-holding-usd text-purple-500"></i> Субсидии <span class="text-gray-300 font-normal">ИАС РСЖ</span>
+                            </h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Всего субсидий (шт)</label>
+                                    <input type="number" x-model.number="farm.subsidyCount" class="w-full text-sm" placeholder="0">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Успешно выполненных</label>
+                                    <input type="number" x-model.number="farm.subsidySuccess" class="w-full text-sm" placeholder="0">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Невозвращённые субсидии (голов)</label>
+                                    <input type="number" x-model.number="farm.pendingReturns" class="w-full text-sm" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ИС ЭСФ: Финансы -->
+                        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <i class="fas fa-file-invoice-dollar text-teal-500"></i> Финансы <span class="text-gray-300 font-normal">ИС ЭСФ</span>
+                            </h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Общая сумма ЭСФ (₸)</label>
+                                    <input type="number" x-model.number="farm.esfTotal" class="w-full text-sm" placeholder="0">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Количество ЭСФ</label>
+                                    <input type="number" x-model.number="farm.esfCount" class="w-full text-sm" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Казначейство -->
+                        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <i class="fas fa-landmark text-indigo-500"></i> Платежи <span class="text-gray-300 font-normal">Казначейство</span>
+                            </h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Всего получено субсидий (₸)</label>
+                                    <input type="number" x-model.number="farm.totalSubsidiesReceived" class="w-full text-sm" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="flex justify-between mt-5">
+                        <button type="button" class="draft-btn" @click="goToStep(5)"><i class="fas fa-arrow-left"></i> Назад</button>
+                        <button type="button" class="btn-lime" @click="currentStep = 7; saveProgress()">Далее <i class="fas fa-arrow-right ml-1"></i></button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===================== STEP 7: Animals + Land Parcels ===================== -->
+        <div class="mb-4" :class="stepClass(7)">
+            <template x-if="currentStep > 7">
+                <div class="completed-summary" @click="goToStep(7)">
+                    <div class="check-icon"><i class="fas fa-check"></i></div>
+                    <div class="step-info">
+                        <div class="step-label">Поголовье и земля</div>
+                        <div class="step-value">
+                            <span x-text="selectedAnimals.length + ' голов'"></span> ·
+                            <span x-text="selectedPlots.length + ' участков'"></span>
+                        </div>
+                    </div>
+                    <div class="edit-btn"><i class="fas fa-pen"></i> Изменить</div>
+                </div>
+            </template>
+            <template x-if="currentStep === 7">
+                <div class="active-card highlight step-section">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="step-bubble active">7</div>
+                        <div>
+                            <h2 class="font-bold text-lg text-gray-900">Поголовье и земельные участки</h2>
+                            <p class="text-sm text-gray-500">Выберите животных и участки для субсидирования</p>
+                        </div>
+                    </div>
+
+                    <!-- Animals list (from ИС ИСЖ) -->
+                    <template x-if="allAnimals.length > 0">
+                        <div class="mb-5">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <i class="fas fa-horse text-blue-500"></i> Поголовье из ИС ИСЖ
+                                <span class="text-gray-300 font-normal" x-text="'(' + allAnimals.length + ' в базе)'"></span>
+                            </h4>
+                            <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                                <template x-for="(animal, i) in allAnimals" :key="i">
+                                    <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all"
+                                           :class="selectedAnimals.includes(i) ? 'border-lime-400 bg-lime-50' : (animal.previously_subsidized ? 'border-red-200 bg-red-50/50 opacity-60' : 'border-gray-100 bg-gray-50/50 hover:border-gray-300')">
+                                        <input type="checkbox" class="rounded accent-lime-500" :value="i"
+                                               :disabled="animal.previously_subsidized"
+                                               @change="toggleAnimal(i)" :checked="selectedAnimals.includes(i)">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-gray-800" x-text="animal.tag"></span>
+                                                <span class="text-xs px-2 py-0.5 rounded-full" :class="animal.age_valid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                                                      x-text="animal.age_months + ' мес.'"></span>
+                                                <span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600" x-text="animal.breed"></span>
+                                            </div>
+                                            <div class="text-xs text-gray-500 mt-0.5">
+                                                <span x-text="animal.type === 'cattle' ? 'КРС' : animal.type === 'sheep' ? 'Овца' : animal.type"></span> ·
+                                                <span x-text="animal.sex === 'male' ? '♂' : '♀'"></span> ·
+                                                <span x-text="animal.category"></span>
+                                                <template x-if="animal.previously_subsidized">
+                                                    <span class="text-red-500 font-semibold ml-1">⛔ ранее субсидировано</span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </template>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-2" x-show="selectedAnimals.length > 0">
+                                Выбрано: <span class="font-semibold text-gray-700" x-text="selectedAnimals.length"></span> голов
+                            </p>
+                        </div>
+                    </template>
+                    <template x-if="allAnimals.length === 0 && isAnimalDirection()">
+                        <div class="mb-5 p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-700">
+                            <i class="fas fa-exclamation-triangle mr-1"></i> Нет верифицированных животных в ИС ИСЖ по данному ИИН/БИН.
+                        </div>
+                    </template>
+
+                    <!-- Land parcels (from ЕГКН) -->
+                    <div class="mb-4">
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                            <i class="fas fa-mountain text-amber-500"></i> Земельные участки из ЕГКН
+                            <span class="text-gray-300 font-normal" x-text="'(' + allPlots.length + ' участков)'"></span>
+                        </h4>
+                        <template x-if="allPlots.length > 0">
+                            <div class="space-y-2">
+                                <template x-for="(plot, i) in allPlots" :key="i">
+                                    <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all"
+                                           :class="selectedPlots.includes(i) ? 'border-lime-400 bg-lime-50' : 'border-gray-100 bg-gray-50/50 hover:border-gray-300'">
+                                        <input type="checkbox" class="rounded accent-lime-500" :value="i"
+                                               @change="togglePlot(i)" :checked="selectedPlots.includes(i)">
+                                        <div class="flex-1">
+                                            <div class="text-sm font-semibold text-gray-800" x-text="plot.cadastral"></div>
+                                            <div class="text-xs text-gray-500">
+                                                <span x-text="plot.area + ' га'"></span> ·
+                                                <span x-text="plot.purpose"></span> ·
+                                                <span x-text="plot.ownership"></span>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-if="allPlots.length === 0">
+                            <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-700">
+                                <i class="fas fa-exclamation-triangle mr-1"></i> Нет земельных участков с/х назначения в ЕГКН.
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="flex justify-between mt-5">
+                        <button type="button" class="draft-btn" @click="goToStep(6)"><i class="fas fa-arrow-left"></i> Назад</button>
+                        <button type="button" class="btn-lime"
+                                :disabled="selectedPlots.length === 0 && allPlots.length > 0"
+                                @click="quantity = isAnimalDirection() ? selectedAnimals.length : quantity; currentStep = 8; saveProgress()">
+                            Далее <i class="fas fa-arrow-right ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===================== STEP 8: ЭСФ + Cost ===================== -->
+        <div class="mb-4" :class="stepClass(8)">
+            <template x-if="currentStep > 8">
+                <div class="completed-summary" @click="goToStep(8)">
+                    <div class="check-icon"><i class="fas fa-check"></i></div>
+                    <div class="step-info">
+                        <div class="step-label">Стоимость и ЭСФ</div>
+                        <div class="step-value" x-text="calcTotal() + ' ₸ · ' + selectedInvoices.length + ' ЭСФ'"></div>
+                    </div>
+                    <div class="edit-btn"><i class="fas fa-pen"></i> Изменить</div>
+                </div>
+            </template>
+            <template x-if="currentStep === 8">
+                <div class="active-card highlight step-section">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="step-bubble active">8</div>
+                        <div>
+                            <h2 class="font-bold text-lg text-gray-900">Стоимость и подтверждение ЭСФ</h2>
+                            <p class="text-sm text-gray-500">Укажите стоимость и выберите электронные счёт-фактуры</p>
+                        </div>
+                    </div>
+
+                    <!-- Quantity & rate -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                                Количество (<span x-text="selectedUnit || 'единиц'"></span>) *
+                            </label>
+                            <div class="qty-stepper">
+                                <button type="button" @click="if(quantity > 1) quantity--">−</button>
+                                <input type="number" name="quantity" x-model.number="quantity" min="1" max="99999">
+                                <button type="button" @click="quantity++">+</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Норматив субсидии</label>
+                            <div class="p-3 rounded-xl bg-gray-50 border border-gray-100 text-sm font-semibold" x-text="Number(selectedRate || 0).toLocaleString('ru-RU') + ' ₸ / ' + (selectedUnit || 'ед.')"></div>
+                        </div>
+                    </div>
+
+                    <!-- Subsidy calculation -->
+                    <div class="total-card mb-5">
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <div class="total-label">Количество</div>
+                                <div class="text-white text-lg font-bold" x-text="(quantity || 0) + ' ' + (selectedUnit || 'ед.')"></div>
+                            </div>
+                            <div>
+                                <div class="total-label">Норматив</div>
+                                <div class="text-white text-lg font-bold" x-text="Number(selectedRate || 0).toLocaleString('ru-RU') + ' ₸'"></div>
+                            </div>
+                            <div>
+                                <div class="total-label">Итого субсидия</div>
+                                <div class="total-value" x-text="calcTotal() + ' ₸'"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ЭСФ selection (from ИС ЭСФ) -->
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <i class="fas fa-file-invoice-dollar text-teal-500"></i> Электронные счёт-фактуры (ИС ЭСФ)
+                    </h4>
+                    <template x-if="allInvoices.length > 0">
+                        <div>
+                            <div class="space-y-2 max-h-48 overflow-y-auto pr-1 mb-3">
+                                <template x-for="(inv, i) in allInvoices" :key="i">
+                                    <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all"
+                                           :class="selectedInvoices.includes(i) ? 'border-lime-400 bg-lime-50' : 'border-gray-100 bg-gray-50/50 hover:border-gray-300'">
+                                        <input type="checkbox" class="rounded accent-lime-500" :value="i"
+                                               @change="toggleInvoice(i)" :checked="selectedInvoices.includes(i)">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-semibold text-gray-800" x-text="inv.number"></span>
+                                                <span class="text-xs px-2 py-0.5 rounded-full" :class="inv.confirmed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
+                                                      x-text="inv.confirmed ? 'Подтверждена' : 'Не подтверждена'"></span>
+                                            </div>
+                                            <div class="text-xs text-gray-500 mt-0.5">
+                                                <span x-text="Number(inv.amount).toLocaleString('ru-RU') + ' ₸'"></span> ·
+                                                <span x-text="inv.date"></span> ·
+                                                <span x-text="inv.seller"></span>
+                                            </div>
+                                            <div class="text-xs text-gray-400" x-text="inv.items_desc"></div>
+                                        </div>
+                                    </label>
+                                </template>
+                            </div>
+                            <!-- ESF sum validation -->
+                            <div class="p-3 rounded-xl text-sm font-medium flex items-center gap-2"
+                                 :class="esfSelectedSum() >= calcTotalRaw() ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'">
+                                <i :class="esfSelectedSum() >= calcTotalRaw() ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'"></i>
+                                <span>Сумма ЭСФ: <span x-text="Number(esfSelectedSum()).toLocaleString('ru-RU')"></span> ₸</span>
+                                <span x-text="esfSelectedSum() >= calcTotalRaw() ? ' ≥ ' : ' < '"></span>
+                                <span>Субсидия: <span x-text="calcTotal()"></span> ₸</span>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="allInvoices.length === 0">
+                        <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-700 mb-3">
+                            <i class="fas fa-exclamation-triangle mr-1"></i> Нет ЭСФ в системе. Укажите номер вручную:
+                            <input type="text" x-model="esfNumber" placeholder="ESF-2025-0001234" class="w-full mt-2">
+                        </div>
+                    </template>
+
+                    <div class="flex justify-between mt-5">
+                        <button type="button" class="draft-btn" @click="goToStep(7)"><i class="fas fa-arrow-left"></i> Назад</button>
+                        <button type="button" class="btn-lime" :disabled="!quantity || quantity < 1"
+                                @click="currentStep = 9; saveProgress()">Далее <i class="fas fa-arrow-right ml-1"></i></button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===================== STEP 9: Documents + Bank ===================== -->
+        <div class="mb-4" :class="stepClass(9)">
+            <template x-if="currentStep > 9">
+                <div class="completed-summary" @click="goToStep(9)">
+                    <div class="check-icon"><i class="fas fa-check"></i></div>
+                    <div class="step-info">
+                        <div class="step-label">Документы и счёт</div>
+                        <div class="step-value" x-text="bankAccount || 'Счёт указан'"></div>
+                    </div>
+                    <div class="edit-btn"><i class="fas fa-pen"></i> Изменить</div>
+                </div>
+            </template>
+            <template x-if="currentStep === 9">
+                <div class="active-card highlight step-section">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="step-bubble active">9</div>
+                        <div>
+                            <h2 class="font-bold text-lg text-gray-900">Документы и банковский счёт</h2>
+                            <p class="text-sm text-gray-500">Загрузите подтверждающие документы и укажите счёт для выплаты</p>
+                        </div>
+                    </div>
+
+                    <!-- Document uploads -->
+                    <div class="space-y-3 mb-5">
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-2">
+                            <i class="fas fa-file-upload text-indigo-500"></i> Подтверждающие документы
+                        </h4>
+                        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
+                            <label class="block text-xs text-gray-600 font-semibold mb-1.5">Договор купли-продажи *</label>
+                            <input type="file" name="doc_purchase_agreement" accept=".pdf,.jpg,.png"
+                                   class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-lime-50 file:text-lime-700 hover:file:bg-lime-100">
+                        </div>
+                        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
+                            <label class="block text-xs text-gray-600 font-semibold mb-1.5">Документ, подтверждающий оплату *</label>
+                            <input type="file" name="doc_payment_confirmation" accept=".pdf,.jpg,.png"
+                                   class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-lime-50 file:text-lime-700 hover:file:bg-lime-100">
+                        </div>
+                        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
+                            <label class="block text-xs text-gray-600 font-semibold mb-1.5">Дополнительные документы (при импорте: карантинный акт, таможенная декларация)</label>
+                            <input type="file" name="doc_additional" accept=".pdf,.jpg,.png" multiple
+                                   class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-lime-50 file:text-lime-700 hover:file:bg-lime-100">
+                        </div>
+                    </div>
+
+                    <!-- Bank account -->
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <i class="fas fa-university text-purple-500"></i> Банковский счёт для получения средств
+                    </h4>
+                    <template x-if="allAccounts.length > 0">
+                        <div class="space-y-2 mb-3">
+                            <template x-for="acc in allAccounts" :key="acc">
+                                <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all"
+                                       :class="bankAccount === acc ? 'border-lime-400 bg-lime-50' : 'border-gray-100 bg-gray-50/50 hover:border-gray-300'">
+                                    <input type="radio" name="bank_account_radio" :value="acc" class="accent-lime-500"
+                                           @change="bankAccount = acc" :checked="bankAccount === acc">
+                                    <span class="text-sm font-mono font-semibold text-gray-800" x-text="acc"></span>
+                                    <span class="text-xs text-gray-400">из ЕАСУ</span>
+                                </label>
+                            </template>
+                        </div>
+                    </template>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1.5">Номер счёта (IBAN) *</label>
+                        <input type="text" x-model="bankAccount" placeholder="KZ..." class="w-full" required>
+                    </div>
+
+                    <div class="flex justify-between mt-5">
+                        <button type="button" class="draft-btn" @click="goToStep(8)"><i class="fas fa-arrow-left"></i> Назад</button>
+                        <button type="button" class="btn-lime" :disabled="!bankAccount"
+                                @click="currentStep = 10; saveProgress()">Далее <i class="fas fa-arrow-right ml-1"></i></button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===================== STEP 10: Confirm + ЭЦП ===================== -->
+        <div class="mb-4" :class="stepClass(10)">
+            <template x-if="currentStep === 10">
+                <div class="active-card highlight step-section">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="step-bubble active">10</div>
+                        <div>
+                            <h2 class="font-bold text-lg text-gray-900">Подтверждение и подпись ЭЦП</h2>
+                            <p class="text-sm text-gray-500">Проверьте данные и подпишите заявку</p>
+                        </div>
+                    </div>
+
+                    <!-- Summary table -->
+                    <div class="rounded-xl border border-gray-100 divide-y divide-gray-100 bg-gray-50/50 mb-4">
+                        <div class="flex justify-between px-5 py-3"><span class="text-gray-500 text-sm">Категория</span><span class="font-semibold text-sm" x-text="categoryLabels[category]"></span></div>
+                        <div class="flex justify-between px-5 py-3"><span class="text-gray-500 text-sm">Направление</span><span class="font-semibold text-sm" x-text="getDirectionName()"></span></div>
+                        <div class="flex justify-between px-5 py-3"><span class="text-gray-500 text-sm">Вид субсидии</span><span class="font-semibold text-sm text-right max-w-[250px]" x-text="selectedTypeName"></span></div>
+                        <div class="flex justify-between px-5 py-3"><span class="text-gray-500 text-sm">Регион</span><span class="font-semibold text-sm" x-text="region + (district ? ', ' + district : '')"></span></div>
+                        <div class="flex justify-between px-5 py-3"><span class="text-gray-500 text-sm">Заявитель</span><span class="font-semibold text-sm" x-text="applicantName + ' (' + iinBin + ') · ' + phone"></span></div>
+                        <template x-if="selectedAnimals.length > 0">
+                            <div class="flex justify-between px-5 py-3 bg-blue-50"><span class="text-gray-500 text-sm">Поголовье</span><span class="font-semibold text-sm text-blue-700" x-text="selectedAnimals.length + ' голов выбрано'"></span></div>
+                        </template>
+                        <div class="flex justify-between px-5 py-3"><span class="text-gray-500 text-sm">Земельные участки</span><span class="font-semibold text-sm" x-text="selectedPlots.length + ' уч.'"></span></div>
+                        <div class="flex justify-between px-5 py-3"><span class="text-gray-500 text-sm">ЭСФ</span><span class="font-semibold text-sm" x-text="selectedInvoices.length + ' шт. на ' + Number(esfSelectedSum()).toLocaleString('ru-RU') + ' ₸'"></span></div>
+                        <div class="flex justify-between px-5 py-3"><span class="text-gray-500 text-sm">Банковский счёт</span><span class="font-semibold text-sm font-mono" x-text="bankAccount"></span></div>
+                        <div class="flex justify-between px-5 py-3 bg-green-50"><span class="text-gray-700 text-sm font-bold">Сумма субсидии</span><span class="font-bold text-lg" style="color: #5A7A00" x-text="calcTotal() + ' ₸'"></span></div>
+                    </div>
+
+                    <!-- Confirmation -->
+                    <label class="confirm-box mb-4">
+                        <input type="checkbox" x-model="confirmed">
+                        <span class="text-sm text-gray-700 leading-relaxed">
+                            Подтверждаю достоверность представленных сведений и даю согласие на проверку данных
+                            в государственных информационных системах (ГИСС, ИАС РСЖ, ЕГКН, ИС ИСЖ, ИС ЭСФ, ЕАСУ, Казначейство).
+                        </span>
+                    </label>
+
+                    <!-- ЭЦП Sign -->
+                    <div class="p-4 rounded-xl border-2 mb-4 transition-all"
+                         :class="ecpSigned ? 'border-lime-400 bg-lime-50' : 'border-dashed border-gray-300 bg-gray-50'">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center"
+                                 :class="ecpSigned ? 'bg-lime-400 text-dark' : 'bg-gray-200 text-gray-400'">
+                                <i :class="ecpSigned ? 'fas fa-shield-alt' : 'fas fa-key'" class="text-sm"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm font-semibold" :class="ecpSigned ? 'text-green-700' : 'text-gray-600'"
+                                   x-text="ecpSigned ? 'Заявка подписана ЭЦП' : 'Требуется подпись ЭЦП'"></p>
+                                <p class="text-xs text-gray-400" x-text="ecpSigned ? 'Подпись: ' + iinBin + ' · ' + new Date().toLocaleString('ru-RU') : 'Нажмите кнопку для подписания'"></p>
+                            </div>
+                            <button type="button" class="btn-dark text-xs px-4 py-2" x-show="!ecpSigned"
+                                    @click="ecpSigned = true">
+                                <i class="fas fa-key mr-1"></i> Подписать ЭЦП
+                            </button>
+                            <span x-show="ecpSigned" class="text-green-600 text-lg"><i class="fas fa-check-circle"></i></span>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between mt-5">
+                        <button type="button" class="draft-btn" @click="goToStep(9)"><i class="fas fa-arrow-left"></i> Назад</button>
+                        <button type="submit" class="btn-lime text-base px-8 py-3" :disabled="!confirmed || !ecpSigned || submitting">
+                            <template x-if="!submitting">
+                                <span><i class="fas fa-paper-plane mr-2"></i> Отправить заявку</span>
+                            </template>
+                            <template x-if="submitting">
+                                <span><i class="fas fa-spinner fa-spin mr-2"></i> Отправка...</span>
+                            </template>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+    </form>
+</div>
+
+<noscript><div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">Для работы формы необходимо включить JavaScript.</div></noscript>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function applicationFlow() {
+    return {
+        currentStep: 1,
+        category: '',
+        direction: '',
+        subsidyType: '',
+        iinBin: '{{ profile_iin|default:"" }}',
+        applicantName: '{{ profile_name|default:""|escapejs }}',
+        entityType: 'legal',
+        region: '',
+        district: '',
+        quantity: 1,
+        phone: '',
+        esfNumber: '',
+        bankAccount: '',
+        ecpSigned: false,
+        confirmed: false,
+        submitting: false,
+        entityFound: false,
+        entityLoading: false,
+        entityId: null,
+        entityName: '',
+        entityRiskLabel: '',
+        entitySystemsCount: 0,
+        farm: {
+            grossProdPrev: 0,
+            grossProdBefore: 0,
+            growthRate: 0,
+            obligationsMet: true,
+            landArea: 0,
+            landPlots: 0,
+            verifiedAnimals: 0,
+            rejectedAnimals: 0,
+            subsidyCount: 0,
+            subsidySuccess: 0,
+            pendingReturns: 0,
+            esfTotal: 0,
+            esfCount: 0,
+            totalSubsidiesReceived: 0
+        },
+        allAnimals: [],
+        allPlots: [],
+        allInvoices: [],
+        allAccounts: [],
+        selectedAnimals: [],
+        selectedPlots: [],
+        selectedInvoices: [],
+        preChecks: {},
+        filteredTypes: [],
+        selectedRate: 0,
+        selectedUnit: '',
+        selectedOrigin: '',
+        selectedTypeName: '',
+        appName: '',
+        map: null,
+        mapMarkers: {},
+
+        categoryLabels: {
+            'livestock': 'Животноводство',
+            'crops': 'Растениеводство',
+            'resources': 'Ресурсы и техника',
+            'other': 'Переработка и другое'
+        },
+
+        allTypes: [
+            {% for st in subsidy_types %}{
+                id: {% localize off %}{{ st.id }}{% endlocalize %},
+                name: '{{ st.name|escapejs }}',
+                dirCode: '{{ st.direction.code }}',
+                dirName: '{{ st.direction.name|escapejs }}',
+                rate: {% localize off %}{{ st.rate }}{% endlocalize %},
+                unit: '{{ st.unit|escapejs }}',
+                origin: '{{ st.origin|escapejs }}',
+                form: {% localize off %}{{ st.form_number }}{% endlocalize %},
+                originLabel: {'domestic':'Отечественный','cis':'Импорт СНГ','import':'Импорт дальнее зарубежье','na':''}['{{ st.origin }}'] || ''
+            },{% endfor %}
+        ],
+
+        dirCat: {
+            'cattle_meat':'livestock','cattle_dairy':'livestock','cattle_general':'livestock',
+            'sheep':'livestock','poultry':'livestock','horse':'livestock',
+            'pig':'livestock','camel':'livestock','beekeeping':'livestock','aquaculture':'livestock',
+            'crops_grain':'crops','crops_oilseed':'crops','crops_cotton':'crops',
+            'crops_sugar':'crops','crops_vegetables':'crops','crops_fruit':'crops',
+            'crops_fodder':'crops','seed_production':'crops',
+            'fertilizers':'resources','fuel':'resources','water':'resources','equipment':'resources',
+            'processing':'other','cooperation':'other','insurance':'other'
+        },
+
+        regionCoords: {
+            'Акмолинская область': [51.1, 69.1],
+            'Актюбинская область': [50.3, 57.2],
+            'Алматинская область': [44.8, 77.0],
+            'Атырауская область': [47.1, 51.9],
+            'Западно-Казахстанская область': [50.2, 51.4],
+            'Жамбылская область': [43.3, 71.4],
+            'Карагандинская область': [48.0, 73.1],
+            'Костанайская область': [52.1, 63.6],
+            'Кызылординская область': [44.8, 65.5],
+            'Мангистауская область': [43.4, 52.0],
+            'Павлодарская область': [52.3, 77.0],
+            'Северо-Казахстанская область': [54.2, 69.2],
+            'Туркестанская область': [42.3, 68.2],
+            'Восточно-Казахстанская область': [49.6, 82.6],
+            'область Абай': [47.8, 79.0],
+            'область Жетісу': [45.5, 79.5],
+            'область Ұлытау': [48.6, 67.4],
+        },
+
+        // === Auto-save progress to Redis ===
+        _saveProgressDebounceTimer: null,
+
+        saveProgress() {
+            var self = this;
+            clearTimeout(this._saveProgressDebounceTimer);
+            this._saveProgressDebounceTimer = setTimeout(function() {
+                var data = {
+                    currentStep: self.currentStep,
+                    category: self.category,
+                    direction: self.direction,
+                    subsidyType: self.subsidyType,
+                    quantity: self.quantity,
+                    phone: self.phone,
+                    esfNumber: self.esfNumber,
+                    bankAccount: self.bankAccount,
+                    selectedAnimals: self.selectedAnimals,
+                    selectedPlots: self.selectedPlots,
+                    selectedInvoices: self.selectedInvoices,
+                    timestamp: new Date().toISOString()
+                };
+                fetch('/api/form-progress/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value},
+                    body: JSON.stringify(data)
+                }).catch(function() {});
+            }, 1000);  // debounce 1 sec
+        },
+
+        loadProgress() {
+            var self = this;
+            return fetch('/api/form-progress/')
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    if (result.saved && result.data) {
+                        var d = result.data;
+                        // Only restore if saved less than 24h ago
+                        if (d.timestamp) {
+                            var saved = new Date(d.timestamp);
+                            var hours = (new Date() - saved) / 3600000;
+                            if (hours > 24) return false;
+                        }
+                        self.category = d.category || '';
+                        self.direction = d.direction || '';
+                        self.subsidyType = d.subsidyType || '';
+                        self.quantity = d.quantity || 1;
+                        self.phone = d.phone || '';
+                        self.esfNumber = d.esfNumber || '';
+                        self.bankAccount = d.bankAccount || '';
+                        self.selectedAnimals = d.selectedAnimals || [];
+                        self.selectedPlots = d.selectedPlots || [];
+                        self.selectedInvoices = d.selectedInvoices || [];
+                        // Restore step (but don't go past step 5 without entity data)
+                        if (d.currentStep && d.currentStep > 1) {
+                            self.currentStep = Math.min(d.currentStep, 5);
+                            if (self.direction) self.doFilter();
+                            if (self.subsidyType) self.doRate();
+                        }
+                        return true;
+                    }
+                    return false;
+                })
+                .catch(function() { return false; });
+        },
+
+        clearProgress() {
+            fetch('/api/form-progress/', {
+                method: 'DELETE',
+                headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value}
+            }).catch(function() {});
+        },
+
+        init() {
+            // Load saved progress from Redis
+            var self = this;
+            this.loadProgress().then(function(restored) {
+                if (restored && self.currentStep > 1) {
+                    console.log('Form progress restored to step ' + self.currentStep);
+                }
+            });
+
+            // Если ИИН предзаполнен из профиля — предзагрузка данных (без перехода на шаг)
+            if (this.iinBin && this.iinBin.length === 12) {
+                var self = this;
+                this.entityLoading = true;
+                fetch('/api/entity-data/' + this.iinBin + '/')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        self.entityLoading = false;
+                        if (data.found) {
+                            self.entityFound = true;
+                            self.entityId = data.entity_id;
+                            self.entityName = data.entity_name || self.applicantName;
+                            self.applicantName = self.applicantName || data.entity_name || '';
+                            self.entityRiskLabel = data.risk_label || '';
+                            self.entitySystemsCount = data.systems_count || 0;
+                            self.region = self.region || data.region || '';
+                            self.district = self.district || data.district || '';
+                            self.entityType = data.entity_type || self.entityType;
+                            var f = data.flat || {};
+                            self.farm.grossProdPrev = f.gross_prod_prev || 0;
+                            self.farm.grossProdBefore = f.gross_prod_before || 0;
+                            self.farm.growthRate = f.growth_rate || 0;
+                            self.farm.obligationsMet = f.obligations_met !== false;
+                            self.farm.landArea = f.land_area || 0;
+                            self.farm.landPlots = f.land_plots || 0;
+                            self.farm.verifiedAnimals = f.verified_animals || 0;
+                            self.farm.rejectedAnimals = f.rejected_animals || 0;
+                            self.farm.subsidyCount = f.subsidy_count || 0;
+                            self.farm.subsidySuccess = f.subsidy_success || 0;
+                            self.farm.pendingReturns = f.pending_returns || 0;
+                            self.farm.esfTotal = f.esf_total || 0;
+                            self.farm.esfCount = f.esf_count || 0;
+                            self.farm.totalSubsidiesReceived = f.total_subsidies_received || 0;
+                            self.allAnimals = data.animals || [];
+                            self.allPlots = data.plots || [];
+                            self.allInvoices = data.invoices || [];
+                            self.allAccounts = data.accounts || [];
+                            self.preChecks = data.checks || {};
+                            if (self.allAccounts.length > 0) {
+                                self.bankAccount = self.allAccounts[0];
+                            }
+                        }
+                    })
+                    .catch(function() { self.entityLoading = false; });
+            }
+        },
+
+        stepClass(step) {
+            if (step < this.currentStep) return 'flow-step visible collapsed';
+            if (step === this.currentStep) return 'flow-step visible';
+            return 'flow-step';
+        },
+
+        goToStep(step) {
+            this.currentStep = step;
+            this.saveProgress();
+            this.$nextTick(() => {
+                if (step === 4 && this.map) {
+                    this.map.invalidateSize();
+                }
+            });
+        },
+
+        getDirectionName() {
+            var d = this.direction;
+            var f = this.allTypes.find(function(t) { return t.dirCode === d; });
+            return f ? f.dirName : '';
+        },
+
+        calcTotal() {
+            return ((this.quantity || 0) * (this.selectedRate || 0)).toLocaleString('ru-RU');
+        },
+
+        doFilter() {
+            this.subsidyType = '';
+            this.selectedRate = 0;
+            this.selectedUnit = '';
+            this.selectedOrigin = '';
+            this.selectedTypeName = '';
+            var d = this.direction;
+            this.filteredTypes = this.allTypes.filter(function(t) { return t.dirCode === d; });
+        },
+
+        doRate() {
+            var id = this.subsidyType;
+            var s = this.allTypes.find(function(t) { return t.id == id; });
+            if (s) {
+                this.selectedRate = s.rate;
+                this.selectedUnit = s.unit;
+                this.selectedOrigin = s.origin;
+                this.selectedTypeName = s.name;
+            }
+        },
+
+        updateAppName() {
+            var parts = [];
+            if (this.categoryLabels[this.category]) parts.push(this.categoryLabels[this.category]);
+            var dirName = this.getDirectionName();
+            if (dirName) parts.push(dirName);
+            if (this.region) parts.push(this.region.replace(' область', '').replace('область ', ''));
+            var now = new Date();
+            var dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+            parts.push(dateStr);
+            this.appName = parts.join(' · ');
+        },
+
+        initMap() {
+            if (this.map) return;
+            var self = this;
+            this.map = L.map('kz-map', {
+                center: [48.0, 67.0],
+                zoom: 5,
+                minZoom: 4,
+                maxZoom: 8,
+                zoomControl: true,
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap',
+                maxZoom: 8,
+            }).addTo(this.map);
+
+            // Add region markers
+            var regionKeys = Object.keys(this.regionCoords);
+            for (var i = 0; i < regionKeys.length; i++) {
+                (function(rName) {
+                    var coords = self.regionCoords[rName];
+                    var marker = L.circleMarker(coords, {
+                        radius: 8,
+                        fillColor: '#C1FF00',
+                        color: '#1A1A2E',
+                        weight: 2,
+                        fillOpacity: 0.7,
+                    }).addTo(self.map);
+
+                    marker.bindTooltip(rName, {
+                        permanent: false,
+                        direction: 'top',
+                        className: 'leaflet-tooltip-custom'
+                    });
+
+                    marker.on('click', function() {
+                        self.region = rName;
+                        self.updateMapSelection();
+                    });
+
+                    self.mapMarkers[rName] = marker;
+                })(regionKeys[i]);
+            }
+        },
+
+        updateMapSelection() {
+            var self = this;
+            var keys = Object.keys(this.mapMarkers);
+            for (var i = 0; i < keys.length; i++) {
+                var rName = keys[i];
+                var marker = this.mapMarkers[rName];
+                if (rName === this.region) {
+                    marker.setStyle({ radius: 14, fillColor: '#C1FF00', fillOpacity: 1, weight: 3 });
+                    marker.openTooltip();
+                } else {
+                    marker.setStyle({ radius: 8, fillColor: '#C1FF00', fillOpacity: 0.5, weight: 2 });
+                    marker.closeTooltip();
+                }
+            }
+        },
+
+        isAnimalDirection() {
+            var animalDirs = ['cattle_meat','cattle_dairy','cattle_general','sheep','poultry','horse','pig','camel','beekeeping','aquaculture'];
+            return animalDirs.indexOf(this.direction) >= 0;
+        },
+
+        toggleAnimal(idx) {
+            var pos = this.selectedAnimals.indexOf(idx);
+            if (pos >= 0) { this.selectedAnimals.splice(pos, 1); }
+            else { this.selectedAnimals.push(idx); }
+        },
+
+        togglePlot(idx) {
+            var pos = this.selectedPlots.indexOf(idx);
+            if (pos >= 0) { this.selectedPlots.splice(pos, 1); }
+            else { this.selectedPlots.push(idx); }
+        },
+
+        toggleInvoice(idx) {
+            var pos = this.selectedInvoices.indexOf(idx);
+            if (pos >= 0) { this.selectedInvoices.splice(pos, 1); }
+            else { this.selectedInvoices.push(idx); }
+        },
+
+        esfSelectedSum() {
+            var self = this;
+            var sum = 0;
+            for (var i = 0; i < this.selectedInvoices.length; i++) {
+                var inv = this.allInvoices[this.selectedInvoices[i]];
+                if (inv) sum += inv.amount;
+            }
+            return sum;
+        },
+
+        calcTotalRaw() {
+            return (this.quantity || 0) * (this.selectedRate || 0);
+        },
+
+        fetchEntityData() {
+            var self = this;
+            this.entityLoading = true;
+            fetch('/api/entity-data/' + this.iinBin + '/')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    self.entityLoading = false;
+                    if (data.found) {
+                        self.entityFound = true;
+                        self.entityId = data.entity_id;
+                        self.entityName = data.entity_name || self.applicantName;
+                        self.entityRiskLabel = data.risk_label || '';
+                        self.entitySystemsCount = data.systems_count || 0;
+                        // Populate farm data from flat API response
+                        var f = data.flat || {};
+                        self.farm.grossProdPrev = f.gross_prod_prev || 0;
+                        self.farm.grossProdBefore = f.gross_prod_before || 0;
+                        self.farm.growthRate = f.growth_rate || 0;
+                        self.farm.obligationsMet = f.obligations_met !== false;
+                        self.farm.landArea = f.land_area || 0;
+                        self.farm.landPlots = f.land_plots || 0;
+                        self.farm.verifiedAnimals = f.verified_animals || 0;
+                        self.farm.rejectedAnimals = f.rejected_animals || 0;
+                        self.farm.subsidyCount = f.subsidy_count || 0;
+                        self.farm.subsidySuccess = f.subsidy_success || 0;
+                        self.farm.pendingReturns = f.pending_returns || 0;
+                        self.farm.esfTotal = f.esf_total || 0;
+                        self.farm.esfCount = f.esf_count || 0;
+                        self.farm.totalSubsidiesReceived = f.total_subsidies_received || 0;
+                        // Lists for selection steps
+                        self.allAnimals = data.animals || [];
+                        self.allPlots = data.plots || [];
+                        self.allInvoices = data.invoices || [];
+                        self.allAccounts = data.accounts || [];
+                        self.preChecks = data.checks || {};
+                        self.selectedAnimals = [];
+                        self.selectedPlots = [];
+                        self.selectedInvoices = [];
+                        // Auto-select first account
+                        if (self.allAccounts.length > 0) {
+                            self.bankAccount = self.allAccounts[0];
+                        }
+                        self.currentStep = 6;
+                        self.saveProgress();
+                    } else {
+                        self.entityFound = false;
+                        self.entityId = null;
+                        self.entityName = '';
+                        self.entityRiskLabel = '';
+                        self.entitySystemsCount = 0;
+                        self.allAnimals = [];
+                        self.allPlots = [];
+                        self.allInvoices = [];
+                        self.allAccounts = [];
+                        // Остаёмся на шаге 5, не прыгаем вперёд
+                    }
+                })
+                .catch(function(err) {
+                    self.entityLoading = false;
+                    self.entityFound = false;
+                    console.error('Error fetching entity data:', err);
+                });
+        },
+
+        saveDraft() {
+            var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            var data = {
+                direction: this.direction,
+                subsidy_type: this.subsidyType,
+                iin_bin: this.iinBin,
+                name: this.applicantName,
+                entity_type: this.entityType,
+                region: this.region,
+                district: this.district,
+                quantity: this.quantity,
+                esf_number: this.esfNumber,
+                app_name: this.appName,
+            };
+            fetch('/applications/draft/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                body: JSON.stringify(data),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.ok) {
+                    alert('Черновик сохранён! Номер: ' + d.number);
+                } else {
+                    alert('Ошибка сохранения: ' + (d.error || 'Неизвестная ошибка'));
+                }
+            })
+            .catch(function() { alert('Ошибка сети'); });
+        }
+    }
+}
+</script>
+
+<style>
+.leaflet-tooltip-custom {
+    background: #1A1A2E;
+    color: #C1FF00;
+    border: none;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.leaflet-tooltip-custom::before {
+    border-top-color: #1A1A2E;
+}
+</style>
+{% endblock %}
