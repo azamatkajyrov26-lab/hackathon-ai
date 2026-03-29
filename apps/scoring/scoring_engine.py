@@ -1,4 +1,5 @@
 import logging
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db import transaction
@@ -217,6 +218,12 @@ class ScoringEngine:
 
             # --- Шаг 6.2: Уведомление заявителю ---
             self._create_notification(application, total_score, recommendation, budget_available)
+
+        # --- Шаг 6.3: Проверка встречных обязательств (Приказ №108) ---
+        try:
+            self._check_subsidy_obligations(application, entity)
+        except Exception as e:
+            logger.warning('Ошибка проверки встречных обязательств: %s', e)
 
         # --- Шаг 7: Обновление рейтинга ---
         try:
@@ -471,3 +478,77 @@ class ScoringEngine:
             title=title,
             message=message,
         )
+
+    def _check_subsidy_obligations(self, application: Application, entity):
+        """
+        Проверка встречных обязательств по Приказу №108.
+
+        Если заявитель получил >100 млн тенге субсидий и имеет снижение
+        валовой продукции 2 года подряд — блокировка:
+          - 1 год при первом нарушении
+          - 2 года при повторном нарушении
+        """
+        applicant = application.applicant
+
+        # Уже заблокирован — пропускаем
+        if applicant.is_blocked and applicant.block_until and applicant.block_until > date.today():
+            return
+
+        giss = entity.giss_data or {}
+        total_subsidies = giss.get('total_subsidies_received', 0)
+
+        # Порог: более 100 млн тенге
+        if total_subsidies <= 100_000_000:
+            return
+
+        # Проверяем снижение валовой продукции 2 года подряд
+        prod_prev = giss.get('gross_production_previous_year', 0)
+        prod_before = giss.get('gross_production_year_before', 0)
+        growth_rate = giss.get('growth_rate', 0)
+
+        # Снижение = отрицательный рост И текущий год ниже предыдущего
+        if growth_rate >= 0 or prod_prev >= prod_before:
+            return
+
+        # Обязательства не выполнены 2 года подряд (declining production)
+        obligations_met = giss.get('obligations_met', True)
+        if obligations_met:
+            return
+
+        # Определяем срок блокировки: повторное нарушение = 2 года, первое = 1 год
+        had_previous_block = bool(applicant.block_reason)
+        if had_previous_block:
+            block_years = 2
+            reason = (
+                'Повторное невыполнение встречных обязательств по субсидиям '
+                '(снижение валовой продукции 2 года подряд). '
+                f'Блокировка на 2 года согласно Приказу №108.'
+            )
+        else:
+            block_years = 1
+            reason = (
+                'Невыполнение встречных обязательств по субсидиям '
+                '(снижение валовой продукции 2 года подряд). '
+                f'Блокировка на 1 год согласно Приказу №108.'
+            )
+
+        applicant.is_blocked = True
+        applicant.block_reason = reason
+        applicant.block_until = date.today() + timedelta(days=365 * block_years)
+        applicant.save(update_fields=['is_blocked', 'block_reason', 'block_until'])
+
+        logger.warning(
+            'Заявитель %s заблокирован на %d год(а): %s',
+            applicant.iin_bin, block_years, reason,
+        )
+
+        # Уведомление
+        target_user = self._find_applicant_user(application)
+        if target_user:
+            Notification.objects.create(
+                user=target_user,
+                application=application,
+                notification_type='rejected',
+                title=f'Блокировка заявителя {applicant.name}',
+                message=reason,
+            )

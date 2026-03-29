@@ -151,6 +151,19 @@ class Command(BaseCommand):
         before = int(prev / (1 + growth / 100))
         total_subs = random.randint(0, 200_000_000)
 
+        # Consecutive years of declining production (Приказ №108)
+        if risk == 'fraudulent':
+            consecutive_decline_years = random.choice([2, 3])
+        elif risk == 'risky':
+            consecutive_decline_years = random.choice([0, 1, 2])
+        elif risk == 'minor_issues':
+            consecutive_decline_years = random.choice([0, 0, 1])
+        else:
+            consecutive_decline_years = 0
+
+        # Whether this is a repeat violation (for ban duration: 1 year vs 2 years)
+        repeat_violation = risk == 'fraudulent' and random.random() > 0.5
+
         return {
             'registered': risk != 'fraudulent' or random.random() > 0.3,
             'gross_production_previous_year': prev,
@@ -159,6 +172,8 @@ class Command(BaseCommand):
             'obligations_met': risk in ('clean', 'minor_issues'),
             'total_subsidies_received': total_subs,
             'obligations_required': total_subs >= 100_000_000,
+            'consecutive_decline_years': consecutive_decline_years,
+            'repeat_violation': repeat_violation,
             'blocked': risk == 'fraudulent' and random.random() > 0.5,
             'block_reason': 'Невыполнение встречных обязательств 2 года подряд' if risk == 'fraudulent' else None,
         }

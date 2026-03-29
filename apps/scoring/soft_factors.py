@@ -116,7 +116,13 @@ class SoftFactorCalculator:
         ]
 
     def _calc_subsidy_history(self) -> dict:
-        """Factor 1: История субсидий (max 20, weight 0.20)."""
+        """Factor 1: История субсидий (max 20, weight 0.20).
+
+        Встречные обязательства (Приказ №108, с 01.01.2025):
+        Получатели >100М тг субсидий обязаны обеспечить рост/сохранение
+        объёма валовой продукции. При снижении продукции и крупном объёме
+        субсидий — штрафной балл.
+        """
         subsidy_history = self.ias_rszh_data.get('subsidy_history', [])
         total_subsidies = len(subsidy_history)
 
@@ -149,6 +155,35 @@ class SoftFactorCalculator:
         else:
             score = success_rate * 16  # 0-8
 
+        # --- Встречные обязательства (Приказ №108): штраф за крупных
+        # получателей с падающей продукцией ---
+        total_received = self.giss_data.get('total_subsidies_received', 0)
+        prev_year = self.giss_data.get('gross_production_previous_year', 0)
+        year_before = self.giss_data.get('gross_production_year_before', 0)
+        counter_obligations_penalty = 0.0
+        co_note = ''
+
+        if total_received > 100_000_000 and year_before > 0:
+            # Large recipient — stricter evaluation per Приказ №108
+            if prev_year < year_before:
+                decline_pct = (year_before - prev_year) / year_before * 100
+                consecutive = self.giss_data.get('consecutive_decline_years', 0)
+                if consecutive >= 2:
+                    # 2+ years of declining production — severe penalty
+                    counter_obligations_penalty = 6.0
+                    co_note = (
+                        f'. Встр. обяз-ва (Приказ №108): получено {total_received / 1e6:.0f}М тг, '
+                        f'падение продукции {decline_pct:.1f}% ({consecutive} г. подряд) — штраф -{counter_obligations_penalty:.0f} б.'
+                    )
+                else:
+                    # Single year decline — moderate penalty
+                    counter_obligations_penalty = 3.0
+                    co_note = (
+                        f'. Встр. обяз-ва (Приказ №108): получено {total_received / 1e6:.0f}М тг, '
+                        f'падение продукции {decline_pct:.1f}% — штраф -{counter_obligations_penalty:.0f} б.'
+                    )
+
+        score -= counter_obligations_penalty
         score = min(20.0, max(0.0, score))
 
         returns_count = sum(
@@ -158,6 +193,8 @@ class SoftFactorCalculator:
         data_source = 'ias_rszh'
         if db_hist.get('total_past_apps', 0) > 0 and db_hist['total_past_apps'] >= len(self.ias_rszh_data.get('subsidy_history', [])):
             data_source = 'ias_rszh + db'
+        if counter_obligations_penalty > 0:
+            data_source += ' + giss'
 
         if total_subsidies == 0:
             explanation = 'Первичный заявитель — нет истории субсидий'
@@ -165,6 +202,7 @@ class SoftFactorCalculator:
             explanation = (
                 f'{total_subsidies} субсидий, {successful} успешных '
                 f'({success_rate:.0%}), {returns_count} невыполненных обязательств'
+                f'{co_note}'
             )
 
         weight = 0.20
@@ -182,6 +220,8 @@ class SoftFactorCalculator:
                 'successful': successful,
                 'success_rate': round(success_rate, 4),
                 'db_history_used': db_hist.get('total_past_apps', 0) > 0,
+                'counter_obligations_penalty': counter_obligations_penalty,
+                'total_subsidies_received_tenge': total_received,
             },
         }
 
@@ -301,7 +341,14 @@ class SoftFactorCalculator:
         }
 
     def _calc_efficiency(self) -> dict:
-        """Factor 4: Эффективность — сохранность поголовья (max 15, weight 0.15)."""
+        """Factor 4: Эффективность — сохранность поголовья + встречные обязательства
+        (max 15, weight 0.15).
+
+        Встречные обязательства (Приказ №108, с 01.01.2025):
+        Формула: Объём валовой продукции = Объём произведённой продукции x Цена.
+        Если обязательства не выполнены 2 года подряд — бан 1 год (первое),
+        2 года (повторное).
+        """
         subsidy_history = self.ias_rszh_data.get('subsidy_history', [])
         total_heads_subsidized = sum(h.get('heads', 0) for h in subsidy_history)
         returns = self.ias_rszh_data.get('pending_returns', 0)
@@ -321,7 +368,60 @@ class SoftFactorCalculator:
             else:
                 score = retention_rate * 8.75  # 0-7
 
+        # --- Встречные обязательства (Приказ №108): проверка динамики
+        # валовой продукции ---
+        prev_year = self.giss_data.get('gross_production_previous_year', 0)
+        year_before = self.giss_data.get('gross_production_year_before', 0)
+        total_received = self.giss_data.get('total_subsidies_received', 0)
+        obligations_required = total_received > 100_000_000
+        consecutive = self.giss_data.get('consecutive_decline_years', 0)
+        repeat_violation = self.giss_data.get('repeat_violation', False)
+
+        co_bonus = 0.0
+        co_penalty = 0.0
+        co_note = ''
+        ban_note = ''
+
+        if obligations_required and year_before > 0:
+            if prev_year >= year_before:
+                # Obligations met — bonus for maintaining/growing production
+                co_bonus = 2.0
+                co_note = (
+                    f'. Встр. обяз-ва выполнены: продукция сохранена/растёт '
+                    f'(+{co_bonus:.0f} б.)'
+                )
+            else:
+                # Production declined
+                if consecutive >= 2:
+                    # 2+ consecutive years — ban applies
+                    co_penalty = 5.0
+                    ban_years = 2 if repeat_violation else 1
+                    ban_note = (
+                        f'. ВНИМАНИЕ: невыполнение встр. обяз-в {consecutive} г. подряд '
+                        f'(Приказ №108) — бан на {ban_years} г.'
+                    )
+                    co_note = (
+                        f'. Встр. обяз-ва НЕ выполнены {consecutive} г. подряд '
+                        f'(-{co_penalty:.0f} б.){ban_note}'
+                    )
+                else:
+                    # Single year decline — warning
+                    co_penalty = 2.0
+                    co_note = (
+                        f'. Встр. обяз-ва: снижение продукции за 1 год '
+                        f'(-{co_penalty:.0f} б., предупреждение)'
+                    )
+        elif not obligations_required and year_before > 0 and prev_year >= year_before:
+            # Not required but still growing — small bonus
+            co_bonus = 1.0
+            co_note = f'. Рост продукции (+{co_bonus:.0f} б.)'
+
+        score = score + co_bonus - co_penalty
         score = min(15.0, max(0.0, score))
+
+        data_source = 'ias_rszh'
+        if co_bonus > 0 or co_penalty > 0:
+            data_source += ' + giss'
 
         if retention_rate is None:
             explanation = 'Нет истории субсидирования поголовья — нейтральная оценка'
@@ -330,6 +430,7 @@ class SoftFactorCalculator:
                 f'Сохранность {retention_rate:.0%} — {returns} возвратов '
                 f'из {total_heads_subsidized} просубсидированных голов'
             )
+        explanation += co_note
 
         weight = 0.15
         return {
@@ -340,11 +441,18 @@ class SoftFactorCalculator:
             'weight': weight,
             'weighted_value': round(score * weight, 2),
             'explanation': explanation,
-            'data_source': 'ias_rszh',
+            'data_source': data_source,
             'raw_data': {
                 'total_heads_subsidized': total_heads_subsidized,
                 'pending_returns': returns,
                 'retention_rate': round(retention_rate, 4) if retention_rate is not None else None,
+                'counter_obligations_required': obligations_required,
+                'counter_obligations_bonus': co_bonus,
+                'counter_obligations_penalty': co_penalty,
+                'consecutive_decline_years': consecutive,
+                'repeat_violation': repeat_violation,
+                'gross_production_previous_year': prev_year,
+                'gross_production_year_before': year_before,
             },
         }
 
