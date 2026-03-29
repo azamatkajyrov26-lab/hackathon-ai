@@ -260,6 +260,8 @@
         <input type="hidden" name="selected_plots" :value="JSON.stringify(selectedPlots.map(function(i){ return allPlots[i] || null; }).filter(Boolean))">
         <input type="hidden" name="selected_invoices" :value="JSON.stringify(selectedInvoices.map(function(i){ return allInvoices[i] || null; }).filter(Boolean))">
         <input type="hidden" name="ecp_signed" :value="ecpSigned ? 'true' : 'false'">
+        <input type="hidden" name="unit_price" :value="unitPrice">
+        <input type="hidden" name="spk_name" :value="spkName">
         <!-- Farm indicator hidden inputs -->
         <input type="hidden" name="farm_gross_prod_prev" :value="farm.grossProdPrev">
         <input type="hidden" name="farm_gross_prod_before" :value="farm.grossProdBefore">
@@ -497,6 +499,40 @@
                             </div>
                             <input type="hidden" name="entity_type" :value="entityType">
                         </div>
+
+                        <!-- ШАГ 9 AS-IS: СПК ветвление — показываем название СПК и список членов -->
+                        <template x-if="entityType === 'cooperative'">
+                            <div class="rounded-xl border border-purple-200 p-4 bg-purple-50/50">
+                                <h4 class="text-xs font-bold text-purple-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <i class="fas fa-users"></i> Данные С/Х кооператива (СПК) — ЕАСУ
+                                </h4>
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-xs text-gray-500 mb-1">Название СПК</label>
+                                        <input type="text" x-model="spkName" name="spk_name" placeholder='СПК "Береке"' class="w-full text-sm"
+                                               :value="spkName">
+                                    </div>
+                                    <template x-if="spkMembers.length > 0">
+                                        <div>
+                                            <label class="block text-xs text-gray-500 mb-2">Члены кооператива (из ЕАСУ)</label>
+                                            <div class="space-y-1 max-h-32 overflow-y-auto">
+                                                <template x-for="(member, mi) in spkMembers" :key="mi">
+                                                    <div class="flex items-center gap-2 p-2 rounded-lg bg-white border border-gray-100 text-xs">
+                                                        <i class="fas fa-user text-gray-400"></i>
+                                                        <span class="font-medium text-gray-700" x-text="member.name"></span>
+                                                        <span class="text-gray-400" x-text="member.iin"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div class="text-xs text-purple-600">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        При подаче от СПК заявка применяется ко всем участникам кооператива. Счёт ЕАСУ будет выбран на следующем шаге.
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                     <div class="flex justify-between mt-5">
                         <button type="button" class="draft-btn" @click="goToStep(4)"><i class="fas fa-arrow-left"></i> Назад</button>
@@ -558,11 +594,11 @@
                         </div>
                     </template>
 
-                    <!-- Pre-checks (hard filter preview) -->
+                    <!-- Pre-checks (hard filter preview) — ШАГ 4 AS-IS: показываем статус регистрации в ГИСС -->
                     <template x-if="entityFound && Object.keys(preChecks).length > 0">
                         <div class="mb-4 rounded-xl border border-gray-100 p-4 bg-gray-50/50">
                             <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
-                                <i class="fas fa-clipboard-check text-blue-500"></i> Предварительные проверки
+                                <i class="fas fa-clipboard-check text-blue-500"></i> Предварительные проверки (7 систем)
                             </h4>
                             <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
                                 <div class="flex items-center gap-1.5 text-xs" :class="preChecks.giss_registered ? 'text-green-600' : 'text-red-600'">
@@ -582,6 +618,62 @@
                                 </div>
                                 <div class="flex items-center gap-1.5 text-xs" :class="preChecks.obligations_met ? 'text-green-600' : 'text-red-600'">
                                     <i :class="preChecks.obligations_met ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i> Обязательства
+                                </div>
+                            </div>
+                            <!-- ШАГ 4: Предупреждения при непройденных проверках -->
+                            <template x-if="!preChecks.giss_registered">
+                                <div class="mt-3 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                    <strong>Не зарегистрирован в ГИСС.</strong> Для подачи заявки необходима регистрация в Государственной информационной системе субсидирования.
+                                    Обратитесь в местное управление сельского хозяйства.
+                                </div>
+                            </template>
+                            <template x-if="!preChecks.ias_registered">
+                                <div class="mt-3 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                    <strong>Не зарегистрирован в ИАС РСЖ.</strong> Регистрация в информационно-аналитической системе развития сельского хозяйства обязательна.
+                                </div>
+                            </template>
+                            <template x-if="!preChecks.not_blocked">
+                                <div class="mt-3 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                                    <i class="fas fa-ban mr-1"></i>
+                                    <strong>Заявитель заблокирован в ГИСС.</strong> Подача заявки невозможна до снятия блокировки.
+                                    <span x-show="preChecks.block_reason" x-text="'Причина: ' + preChecks.block_reason"></span>
+                                </div>
+                            </template>
+                            <template x-if="!preChecks.has_land">
+                                <div class="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+                                    <i class="fas fa-map mr-1"></i>
+                                    <strong>Нет с/х земли в ЕГКН.</strong> У вас не найдены земельные участки сельскохозяйственного назначения.
+                                </div>
+                            </template>
+                            <template x-if="!preChecks.obligations_met">
+                                <div class="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+                                    <i class="fas fa-handshake-slash mr-1"></i>
+                                    <strong>Встречные обязательства не выполнены.</strong> По ранее полученным субсидиям есть невыполненные обязательства.
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- ШАГ 4: ГИСС статистика за текущий год -->
+                    <template x-if="entityFound && preChecks.giss_registered && farm.grossProdPrev > 0">
+                        <div class="mb-4 rounded-xl border border-blue-100 p-4 bg-blue-50/50">
+                            <h4 class="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                <i class="fas fa-chart-bar"></i> Статистика ГИСС за текущий год
+                            </h4>
+                            <div class="grid grid-cols-3 gap-3 text-center">
+                                <div>
+                                    <div class="text-lg font-bold text-gray-800" x-text="Number(farm.grossProdPrev).toLocaleString('ru-RU')"></div>
+                                    <div class="text-xs text-gray-500">Валовая продукция (пред. год), ₸</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-bold" :class="farm.growthRate >= 0 ? 'text-green-600' : 'text-red-600'" x-text="(farm.growthRate >= 0 ? '+' : '') + farm.growthRate + '%'"></div>
+                                    <div class="text-xs text-gray-500">Темп роста</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-bold" :class="farm.obligationsMet ? 'text-green-600' : 'text-red-600'" x-text="farm.obligationsMet ? 'Да' : 'Нет'"></div>
+                                    <div class="text-xs text-gray-500">Обязательства</div>
                                 </div>
                             </div>
                         </div>
@@ -734,33 +826,64 @@
                         </div>
                     </div>
 
+                    <!-- ШАГ 11 AS-IS: Фильтрация животных по возрастным критериям -->
+                    <template x-if="allAnimals.length > 0 && isAnimalDirection()">
+                        <div class="mb-4 rounded-xl border border-blue-100 p-3 bg-blue-50/30">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="text-xs font-bold text-blue-600 uppercase tracking-wide flex items-center gap-2">
+                                    <i class="fas fa-filter"></i> Фильтр по критериям субсидии
+                                </h4>
+                                <label class="flex items-center gap-2 text-xs cursor-pointer">
+                                    <input type="checkbox" x-model="filterByAge" class="rounded accent-blue-500">
+                                    <span class="text-gray-600">Только подходящие по возрасту</span>
+                                </label>
+                            </div>
+                            <div class="flex flex-wrap gap-2 text-xs">
+                                <span class="px-2 py-1 rounded-full bg-green-100 text-green-700">
+                                    <i class="fas fa-check mr-1"></i>Подходят: <strong x-text="getEligibleAnimalsCount()"></strong>
+                                </span>
+                                <span class="px-2 py-1 rounded-full bg-red-100 text-red-700">
+                                    <i class="fas fa-times mr-1"></i>Не подходят по возрасту: <strong x-text="allAnimals.filter(a => !a.age_valid).length"></strong>
+                                </span>
+                                <span class="px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                                    <i class="fas fa-ban mr-1"></i>Ранее субсидированы: <strong x-text="allAnimals.filter(a => a.previously_subsidized).length"></strong>
+                                </span>
+                            </div>
+                        </div>
+                    </template>
+
                     <!-- Animals list (from ИС ИСЖ) -->
                     <template x-if="allAnimals.length > 0">
                         <div class="mb-5">
                             <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
                                 <i class="fas fa-horse text-blue-500"></i> Поголовье из ИС ИСЖ
-                                <span class="text-gray-300 font-normal" x-text="'(' + allAnimals.length + ' в базе)'"></span>
+                                <span class="text-gray-300 font-normal" x-text="'(' + getFilteredAnimals().length + ' из ' + allAnimals.length + ')'"></span>
                             </h4>
                             <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
-                                <template x-for="(animal, i) in allAnimals" :key="i">
+                                <template x-for="(animal, i) in getFilteredAnimals()" :key="animal._origIdx">
                                     <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all"
-                                           :class="selectedAnimals.includes(i) ? 'border-lime-400 bg-lime-50' : (animal.previously_subsidized ? 'border-red-200 bg-red-50/50 opacity-60' : 'border-gray-100 bg-gray-50/50 hover:border-gray-300')">
-                                        <input type="checkbox" class="rounded accent-lime-500" :value="i"
+                                           :class="selectedAnimals.includes(animal._origIdx) ? 'border-lime-400 bg-lime-50' : (animal.previously_subsidized ? 'border-red-200 bg-red-50/50 opacity-60' : 'border-gray-100 bg-gray-50/50 hover:border-gray-300')">
+                                        <input type="checkbox" class="rounded accent-lime-500" :value="animal._origIdx"
                                                :disabled="animal.previously_subsidized"
-                                               @change="toggleAnimal(i)" :checked="selectedAnimals.includes(i)">
+                                               @change="toggleAnimal(animal._origIdx)" :checked="selectedAnimals.includes(animal._origIdx)">
                                         <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-2">
+                                            <div class="flex items-center gap-2 flex-wrap">
                                                 <span class="text-sm font-semibold text-gray-800" x-text="animal.tag"></span>
                                                 <span class="text-xs px-2 py-0.5 rounded-full" :class="animal.age_valid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
                                                       x-text="animal.age_months + ' мес.'"></span>
                                                 <span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600" x-text="animal.breed"></span>
+                                                <template x-if="animal.vet_status && animal.vet_status !== 'healthy'">
+                                                    <span class="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                                                        <i class="fas fa-stethoscope mr-0.5"></i> <span x-text="animal.vet_status"></span>
+                                                    </span>
+                                                </template>
                                             </div>
                                             <div class="text-xs text-gray-500 mt-0.5">
-                                                <span x-text="animal.type === 'cattle' ? 'КРС' : animal.type === 'sheep' ? 'Овца' : animal.type"></span> ·
+                                                <span x-text="animal.type === 'cattle' ? 'КРС' : animal.type === 'sheep' ? 'Овца' : animal.type === 'horse' ? 'Лошадь' : animal.type"></span> ·
                                                 <span x-text="animal.sex === 'male' ? '♂' : '♀'"></span> ·
                                                 <span x-text="animal.category"></span>
                                                 <template x-if="animal.previously_subsidized">
-                                                    <span class="text-red-500 font-semibold ml-1">⛔ ранее субсидировано</span>
+                                                    <span class="text-red-500 font-semibold ml-1">ранее субсидировано</span>
                                                 </template>
                                             </div>
                                         </div>
@@ -770,6 +893,18 @@
                             <p class="text-xs text-gray-400 mt-2" x-show="selectedAnimals.length > 0">
                                 Выбрано: <span class="font-semibold text-gray-700" x-text="selectedAnimals.length"></span> голов
                             </p>
+                        </div>
+                    </template>
+
+                    <!-- ШАГ 13 AS-IS: Кросс-валидация ИАС РСЖ + ИС ИСЖ -->
+                    <template x-if="entityFound && isAnimalDirection() && selectedAnimals.length > 0">
+                        <div class="mb-4 rounded-xl border p-3 text-xs"
+                             :class="getCrossValidation().valid ? 'border-green-200 bg-green-50/50 text-green-700' : 'border-amber-200 bg-amber-50/50 text-amber-700'">
+                            <div class="flex items-center gap-2 font-semibold mb-1">
+                                <i :class="getCrossValidation().valid ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle'"></i>
+                                Кросс-проверка ИАС РСЖ ↔ ИС ИСЖ
+                            </div>
+                            <p x-text="getCrossValidation().message"></p>
                         </div>
                     </template>
                     <template x-if="allAnimals.length === 0 && isAnimalDirection()">
@@ -861,6 +996,34 @@
                             <div class="p-3 rounded-xl bg-gray-50 border border-gray-100 text-sm font-semibold" x-text="Number(selectedRate || 0).toLocaleString('ru-RU') + ' ₸ / ' + (selectedUnit || 'ед.')"></div>
                         </div>
                     </div>
+
+                    <!-- ШАГ 14 AS-IS: Стоимость за единицу (для каждого животного) -->
+                    <template x-if="isAnimalDirection() && selectedAnimals.length > 0">
+                        <div class="mb-5">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                <i class="fas fa-tag text-orange-500"></i> Фактическая стоимость за голову
+                            </h4>
+                            <div class="p-3 rounded-xl bg-orange-50/50 border border-orange-100 mb-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex-1">
+                                        <label class="block text-xs text-gray-600 mb-1">Цена за 1 голову (₸)</label>
+                                        <input type="number" x-model.number="unitPrice" name="unit_price" placeholder="0" class="w-full text-sm">
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-xs text-gray-500">Итого фактическая стоимость</div>
+                                        <div class="text-sm font-bold text-gray-800" x-text="Number((unitPrice || 0) * selectedAnimals.length).toLocaleString('ru-RU') + ' ₸'"></div>
+                                    </div>
+                                </div>
+                                <template x-if="unitPrice > 0 && unitPrice < selectedRate">
+                                    <div class="mt-2 text-xs text-amber-600">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        Фактическая цена (<span x-text="Number(unitPrice).toLocaleString('ru-RU')"></span> ₸) ниже норматива (<span x-text="Number(selectedRate).toLocaleString('ru-RU')"></span> ₸).
+                                        Субсидия будет рассчитана по фактической стоимости.
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
 
                     <!-- Subsidy calculation -->
                     <div class="total-card mb-5">
@@ -956,11 +1119,24 @@
                         </div>
                     </div>
 
+                    <!-- ШАГ 16 AS-IS: Import/Domestic branching — разные документы -->
+                    <template x-if="selectedOrigin === 'import' || selectedOrigin === 'cis'">
+                        <div class="mb-4 p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-700">
+                            <i class="fas fa-globe mr-1"></i>
+                            <strong x-text="selectedOrigin === 'import' ? 'Импорт (дальнее зарубежье)' : 'Импорт (СНГ)'"></strong> —
+                            требуются дополнительные документы: таможенная декларация, акт карантинирования, ветеринарный сертификат.
+                        </div>
+                    </template>
+
                     <!-- Document uploads -->
                     <div class="space-y-3 mb-5">
                         <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-2">
                             <i class="fas fa-file-upload text-indigo-500"></i> Подтверждающие документы
+                            <template x-if="selectedOrigin === 'import' || selectedOrigin === 'cis'">
+                                <span class="text-blue-500 font-normal">(импорт — расширенный пакет)</span>
+                            </template>
                         </h4>
+                        <!-- Базовые документы (всегда) -->
                         <div class="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
                             <label class="block text-xs text-gray-600 font-semibold mb-1.5">Договор купли-продажи *</label>
                             <input type="file" name="doc_purchase_agreement" accept=".pdf,.jpg,.png"
@@ -971,11 +1147,50 @@
                             <input type="file" name="doc_payment_confirmation" accept=".pdf,.jpg,.png"
                                    class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-lime-50 file:text-lime-700 hover:file:bg-lime-100">
                         </div>
-                        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
-                            <label class="block text-xs text-gray-600 font-semibold mb-1.5">Дополнительные документы (при импорте: карантинный акт, таможенная декларация)</label>
-                            <input type="file" name="doc_additional" accept=".pdf,.jpg,.png" multiple
-                                   class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-lime-50 file:text-lime-700 hover:file:bg-lime-100">
-                        </div>
+                        <!-- Документы для импорта (ШАГ 16) -->
+                        <template x-if="selectedOrigin === 'import' || selectedOrigin === 'cis'">
+                            <div class="space-y-3">
+                                <div class="rounded-xl border border-blue-200 p-4 bg-blue-50/50">
+                                    <label class="block text-xs text-blue-700 font-semibold mb-1.5">
+                                        <i class="fas fa-ship mr-1"></i> Таможенная декларация *
+                                    </label>
+                                    <input type="file" name="doc_customs_declaration" accept=".pdf,.jpg,.png"
+                                           class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                </div>
+                                <div class="rounded-xl border border-blue-200 p-4 bg-blue-50/50">
+                                    <label class="block text-xs text-blue-700 font-semibold mb-1.5">
+                                        <i class="fas fa-shield-virus mr-1"></i> Акт карантинирования *
+                                    </label>
+                                    <input type="file" name="doc_quarantine_act" accept=".pdf,.jpg,.png"
+                                           class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                </div>
+                                <div class="rounded-xl border border-blue-200 p-4 bg-blue-50/50">
+                                    <label class="block text-xs text-blue-700 font-semibold mb-1.5">
+                                        <i class="fas fa-notes-medical mr-1"></i> Ветеринарный сертификат *
+                                    </label>
+                                    <input type="file" name="doc_veterinary_cert" accept=".pdf,.jpg,.png"
+                                           class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                </div>
+                            </div>
+                        </template>
+                        <!-- Документы для отечественных -->
+                        <template x-if="selectedOrigin !== 'import' && selectedOrigin !== 'cis'">
+                            <div class="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
+                                <label class="block text-xs text-gray-600 font-semibold mb-1.5">Дополнительные документы (племенное свидетельство, акт бонитировки)</label>
+                                <input type="file" name="doc_additional" accept=".pdf,.jpg,.png" multiple
+                                       class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-lime-50 file:text-lime-700 hover:file:bg-lime-100">
+                            </div>
+                        </template>
+                        <!-- Документы для СПК -->
+                        <template x-if="entityType === 'cooperative'">
+                            <div class="rounded-xl border border-purple-200 p-4 bg-purple-50/50">
+                                <label class="block text-xs text-purple-700 font-semibold mb-1.5">
+                                    <i class="fas fa-users mr-1"></i> Документ о членстве в СПК *
+                                </label>
+                                <input type="file" name="doc_spk_membership" accept=".pdf,.jpg,.png"
+                                       class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100">
+                            </div>
+                        </template>
                     </div>
 
                     <!-- Bank account -->
@@ -1032,6 +1247,9 @@
                             <div class="flex justify-between px-5 py-3 bg-blue-50"><span class="text-gray-500 text-sm">Поголовье</span><span class="font-semibold text-sm text-blue-700" x-text="selectedAnimals.length + ' голов выбрано'"></span></div>
                         </template>
                         <div class="flex justify-between px-5 py-3"><span class="text-gray-500 text-sm">Земельные участки</span><span class="font-semibold text-sm" x-text="selectedPlots.length + ' уч.'"></span></div>
+                        <template x-if="unitPrice > 0">
+                            <div class="flex justify-between px-5 py-3"><span class="text-gray-500 text-sm">Цена за голову</span><span class="font-semibold text-sm" x-text="Number(unitPrice).toLocaleString('ru-RU') + ' ₸'"></span></div>
+                        </template>
                         <div class="flex justify-between px-5 py-3"><span class="text-gray-500 text-sm">ЭСФ</span><span class="font-semibold text-sm" x-text="selectedInvoices.length + ' шт. на ' + Number(esfSelectedSum()).toLocaleString('ru-RU') + ' ₸'"></span></div>
                         <div class="flex justify-between px-5 py-3"><span class="text-gray-500 text-sm">Банковский счёт</span><span class="font-semibold text-sm font-mono" x-text="bankAccount"></span></div>
                         <div class="flex justify-between px-5 py-3 bg-green-50"><span class="text-gray-700 text-sm font-bold">Сумма субсидии</span><span class="font-bold text-lg" style="color: #5A7A00" x-text="calcTotal() + ' ₸'"></span></div>
@@ -1138,6 +1356,10 @@ function applicationFlow() {
         selectedPlots: [],
         selectedInvoices: [],
         preChecks: {},
+        filterByAge: true,
+        spkName: '',
+        spkMembers: [],
+        unitPrice: 0,
         filteredTypes: [],
         selectedRate: 0,
         selectedUnit: '',
@@ -1452,6 +1674,33 @@ function applicationFlow() {
             return animalDirs.indexOf(this.direction) >= 0;
         },
 
+        // ШАГ 11: Filter animals by age criteria for selected subsidy type
+        getFilteredAnimals() {
+            var animals = this.allAnimals.map(function(a, i) { a._origIdx = i; return a; });
+            if (this.filterByAge && this.isAnimalDirection()) {
+                return animals.filter(function(a) { return a.age_valid && !a.previously_subsidized; });
+            }
+            return animals;
+        },
+
+        getEligibleAnimalsCount() {
+            return this.allAnimals.filter(function(a) { return a.age_valid && !a.previously_subsidized; }).length;
+        },
+
+        // ШАГ 13: Cross-validation IAS RSZh + IS ISZh
+        getCrossValidation() {
+            var selected = this.selectedAnimals.length;
+            var verified = this.farm.verifiedAnimals || 0;
+            var subsidyCount = this.farm.subsidyCount || 0;
+            if (selected > verified) {
+                return {valid: false, message: 'Выбрано ' + selected + ' голов, но в ИС ИСЖ верифицировано только ' + verified + '. Проверьте данные.'};
+            }
+            if (this.farm.pendingReturns > 0) {
+                return {valid: false, message: 'В ИАС РСЖ зафиксированы невозвращённые субсидии (' + this.farm.pendingReturns + ' шт). Это может повлиять на решение.'};
+            }
+            return {valid: true, message: 'Данные ИАС РСЖ и ИС ИСЖ согласованы. Выбрано ' + selected + ' голов из ' + verified + ' верифицированных.'};
+        },
+
         toggleAnimal(idx) {
             var pos = this.selectedAnimals.indexOf(idx);
             if (pos >= 0) { this.selectedAnimals.splice(pos, 1); }
@@ -1522,6 +1771,12 @@ function applicationFlow() {
                         self.selectedAnimals = [];
                         self.selectedPlots = [];
                         self.selectedInvoices = [];
+                        // SPK data (ШАГ 9)
+                        self.spkName = data.spk_name || '';
+                        self.spkMembers = data.spk_members || [];
+                        if (data.entity_type === 'cooperative') {
+                            self.entityType = 'cooperative';
+                        }
                         // Auto-select first account
                         if (self.allAccounts.length > 0) {
                             self.bankAccount = self.allAccounts[0];

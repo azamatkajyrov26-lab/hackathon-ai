@@ -67,19 +67,18 @@ class ScoringEngine:
         hf_result = checker.check_all()
 
         if not hf_result['all_passed']:
-            # Hard filter не пройден — информирование (не отказ!)
-            # Заявка НЕ отклоняется, статус "checking" сохраняется.
-            # Фермер получает подробное уведомление что нужно исправить.
-            info_message = self._build_info_notification(hf_result['failed_reasons'])
+            # Hard filter не пройден — ОТКАЗ по Приказу №108 МСХ РК.
+            # Заявка отклоняется автоматически с указанием причин.
+            reject_message = self._build_info_notification(hf_result['failed_reasons'])
 
-            application.status = 'checking'
+            application.status = 'rejected'
             application.save(update_fields=['status', 'updated_at'])
 
-            # Отправляем подробное уведомление фермеру
+            # Отправляем уведомление фермеру с причинами отказа
             self._send_hard_filter_notification(application, hf_result['failed_reasons'])
 
             logger.info(
-                'Заявка %s: hard filters FAIL — информирование — %s',
+                'Заявка %s: hard filters FAIL — ОТКАЗ — %s',
                 application.number,
                 ', '.join(hf_result['failed_reasons']),
             )
@@ -90,8 +89,8 @@ class ScoringEngine:
                 'score': None,
                 'factors': [],
                 'total_score': 0,
-                'recommendation': 'info',
-                'recommendation_reason': info_message,
+                'recommendation': 'reject',
+                'recommendation_reason': reject_message,
             }
 
         # --- Шаг 3: Soft Factors ---
@@ -398,12 +397,12 @@ class ScoringEngine:
         )
 
     def _build_info_notification(self, failed_reasons: list[str]) -> str:
-        """Формирует информационное сообщение (не отказ) по результатам проверок."""
+        """Формирует сообщение об отказе по результатам обязательных проверок (Приказ №108)."""
         reasons_text = '; '.join(failed_reasons)
         return (
-            f'Обращаем ваше внимание: при проверке заявки обнаружены '
-            f'несоответствия, которые необходимо устранить: {reasons_text}. '
-            f'Подробные рекомендации направлены в ваш личный кабинет.'
+            f'Заявка отклонена по результатам обязательных проверок (Приказ №108 МСХ РК). '
+            f'Не выполнены условия: {reasons_text}. '
+            f'Устраните несоответствия и подайте заявку повторно.'
         )
 
     def _send_hard_filter_notification(self, application, failed_reasons: list[str]):
@@ -438,19 +437,19 @@ class ScoringEngine:
         details_text = '\n\n'.join(details)
 
         message = (
-            f'По вашей заявке {application.number} проведена автоматическая проверка данных. '
-            f'Обнаружены следующие несоответствия, которые необходимо устранить:\n\n'
+            f'Заявка {application.number} отклонена по результатам обязательных проверок '
+            f'(Приказ №108 МСХ РК).\n\n'
+            f'Не выполнены следующие условия:\n\n'
             f'{details_text}\n\n'
-            f'После устранения указанных замечаний вы можете подать заявку повторно. '
-            f'Данная проверка носит информационный характер и не является отказом в субсидировании.\n\n'
+            f'После устранения указанных несоответствий вы можете подать заявку повторно.\n\n'
             f'По вопросам обращайтесь в управление сельского хозяйства вашего района.'
         )
 
         Notification.objects.create(
             user=target_user,
             application=application,
-            notification_type='info',
-            title=f'Информирование по заявке {application.number} — требуется обновление данных',
+            notification_type='hard_filter_fail',
+            title=f'Отказ по заявке {application.number} — обязательные проверки не пройдены',
             message=message,
         )
 

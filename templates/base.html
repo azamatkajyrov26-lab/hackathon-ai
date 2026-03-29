@@ -176,9 +176,12 @@
 
                 <!-- Уведомления: applicant, mio_specialist, mio_head, admin -->
                 {% if user_role == 'applicant' or user_role == 'mio_specialist' or user_role == 'commission_member' or user_role == 'mio_head' or user_role == 'admin' %}
-                <a href="/notifications/" class="nav-item flex items-center gap-3 {% if '/notifications' in request.path %}active{% endif %}">
+                <a href="/notifications/" class="nav-item flex items-center gap-3 {% if '/notifications' in request.path %}active{% endif %}" style="position: relative;">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                     Уведомления
+                    {% if unread_notifications %}
+                    <span style="position: absolute; top: 4px; left: 28px; min-width: 18px; height: 18px; background: #EF4444; color: #fff; font-size: 10px; font-weight: 700; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 4px; line-height: 1;">{{ unread_notifications }}</span>
+                    {% endif %}
                 </a>
                 {% endif %}
 

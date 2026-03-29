@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Заявка отправлена — SubsidyAI{% endblock %}
+{% block page_title %}Заявка отправлена{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+    .success-check {
+        width: 96px; height: 96px; border-radius: 50%;
+        background: linear-gradient(135deg, #C1FF00, #8BC500);
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto;
+        animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .success-check i { font-size: 40px; color: #1A1A2E; }
+    @keyframes scaleIn {
+        from { transform: scale(0); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+    .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #F3F4F6; }
+    .info-row:last-child { border-bottom: none; }
+    .confetti { position: fixed; top: -10px; pointer-events: none; z-index: 999; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in max-w-xl mx-auto space-y-6 py-8">
+
+    <!-- Success Icon -->
+    <div class="text-center">
+        <div class="success-check">
+            <i class="fas fa-check"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-900 mt-6">Заявка успешно отправлена!</h2>
+        <p class="text-gray-500 mt-2">Ваша заявка зарегистрирована и прошла автоматический скоринг</p>
+    </div>
+
+    <!-- Application Summary -->
+    <div class="card-glass p-6">
+        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="fas fa-file-alt mr-1"></i> Данные заявки</h3>
+        <div class="text-sm">
+            <div class="info-row">
+                <span class="text-gray-500">Номер заявки</span>
+                <span class="font-mono font-bold text-gray-900">{{ app.number }}</span>
+            </div>
+            <div class="info-row">
+                <span class="text-gray-500">Заявитель</span>
+                <span class="font-medium text-gray-900">{{ app.applicant.name }}</span>
+            </div>
+            <div class="info-row">
+                <span class="text-gray-500">Вид субсидии</span>
+                <span class="text-gray-900">{{ app.subsidy_type.name }}</span>
+            </div>
+            <div class="info-row">
+                <span class="text-gray-500">Сумма</span>
+                <span class="font-mono font-bold" style="color: #5A7A00;">{{ app.total_amount|floatformat:0|intcomma }} &#8376;</span>
+            </div>
+            <div class="info-row">
+                <span class="text-gray-500">Статус</span>
+                <span>
+                    {% if app.status == 'approved' %}<span class="badge-success text-xs px-3 py-1 rounded-lg">Одобрена</span>
+                    {% elif app.status == 'checking' %}<span class="badge-warning text-xs px-3 py-1 rounded-lg">На рассмотрении</span>
+                    {% elif app.status == 'waiting_list' %}<span class="badge-warning text-xs px-3 py-1 rounded-lg">Лист ожидания</span>
+                    {% elif app.status == 'submitted' %}<span class="badge-lime text-xs px-3 py-1 rounded-lg">Подана</span>
+                    {% elif app.status == 'rejected' %}<span class="badge-error text-xs px-3 py-1 rounded-lg">Отказ</span>
+                    {% else %}<span class="badge-info text-xs px-3 py-1 rounded-lg">{{ app.get_status_display }}</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="text-gray-500">Дата подачи</span>
+                <span class="text-gray-900">{{ app.submitted_at|date:"d.m.Y H:i" }}</span>
+            </div>
+        </div>
+    </div>
+
+    {% if score %}
+    <!-- Scoring Result -->
+    <div class="card-glass p-6">
+        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="fas fa-brain mr-1"></i> Результат AI-скоринга</h3>
+        <div class="flex items-center gap-6">
+            <div style="width: 80px; height: 80px; border-radius: 50%; border: 5px solid {% if score.total_score >= 70 %}#34D399{% elif score.total_score >= 40 %}#FBBF24{% else %}#F87171{% endif %}; display: flex; align-items: center; justify-content: center; flex-direction: column; flex-shrink: 0;">
+                <span style="font-size: 28px; font-weight: 800; color: {% if score.total_score >= 70 %}#059669{% elif score.total_score >= 40 %}#D97706{% else %}#DC2626{% endif %};">{{ score.total_score|floatformat:0 }}</span>
+                <span style="font-size: 10px; color: #9CA3AF;">из 100</span>
+            </div>
+            <div>
+                {% if score.recommendation == 'approve' %}
+                <span class="badge-success text-sm px-4 py-1.5 rounded-lg font-bold">ОДОБРИТЬ</span>
+                {% elif score.recommendation == 'review' %}
+                <span class="badge-warning text-sm px-4 py-1.5 rounded-lg font-bold">НА РАССМОТРЕНИЕ</span>
+                {% elif score.recommendation == 'info' %}
+                <span class="badge-info text-sm px-4 py-1.5 rounded-lg font-bold">ИНФОРМИРОВАНИЕ</span>
+                {% else %}
+                <span class="badge-error text-sm px-4 py-1.5 rounded-lg font-bold">ОТКЛОНИТЬ</span>
+                {% endif %}
+                <p class="text-xs text-gray-500 mt-2">Модель v{{ score.model_version }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Next Steps -->
+    <div class="card-glass p-6" style="background: linear-gradient(135deg, #F0FDF4, #ECFDF5); border-color: #BBF7D0;">
+        <h3 class="text-xs font-bold text-green-800 uppercase tracking-wider mb-3"><i class="fas fa-list-check mr-1"></i> Что дальше?</h3>
+        <div class="space-y-3 text-sm text-green-800">
+            <div class="flex gap-3">
+                <div style="width: 24px; height: 24px; border-radius: 50%; background: #C1FF00; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #1A1A2E;">1</div>
+                <p>Заявка автоматически проверена по <strong>15 критериям</strong> из 7 государственных систем</p>
+            </div>
+            <div class="flex gap-3">
+                <div style="width: 24px; height: 24px; border-radius: 50%; background: #C1FF00; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #1A1A2E;">2</div>
+                <p>AI-модель рассчитала скоринговый балл по <strong>8 факторам</strong></p>
+            </div>
+            <div class="flex gap-3">
+                <div style="width: 24px; height: 24px; border-radius: 50%; background: #E5E7EB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #6B7280;">3</div>
+                <p>Комиссия рассмотрит заявку и примет решение. Вы получите <strong>уведомление</strong></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex flex-col sm:flex-row gap-3">
+        <a href="/applications/{{ app.id }}/" class="btn-lime text-sm text-center flex-1 py-3 rounded-xl" style="text-decoration: none;">
+            <i class="fas fa-eye mr-2"></i>Подробности заявки
+        </a>
+        <a href="/applications/" class="btn-ghost-custom text-sm text-center flex-1 py-3 rounded-xl" style="text-decoration: none;">
+            <i class="fas fa-list mr-2"></i>Все заявки
+        </a>
+        <a href="/notifications/" class="btn-ghost-custom text-sm text-center flex-1 py-3 rounded-xl" style="text-decoration: none;">
+            <i class="fas fa-bell mr-2"></i>Уведомления
+        </a>
+    </div>
+</div>
+{% endblock %}

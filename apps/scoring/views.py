@@ -362,7 +362,7 @@ def application_create(request):
         )
 
         messages.success(request, f'Заявка {app.number} создана и оценена')
-        return redirect(f'/applications/{app.id}/')
+        return redirect(f'/applications/{app.id}/success/')
 
     regions = Application.objects.values_list('region', flat=True).distinct().order_by('region')
 
@@ -386,6 +386,26 @@ def application_create(request):
     })
 
 
+@login_required
+def application_success(request, pk):
+    """Экран успешной подачи заявки."""
+    app = get_object_or_404(Application, pk=pk)
+    try:
+        score = app.score
+    except Score.DoesNotExist:
+        score = None
+    return render(request, 'scoring/application_success.html', {
+        'app': app,
+        'score': score,
+    })
+
+
+@login_required
+def scoring_methodology(request):
+    """Страница с описанием методологии скоринга — формулы и объяснения."""
+    return render(request, 'scoring/scoring_methodology.html')
+
+
 @role_required('applicant', 'mio_specialist', 'mio_head', 'commission_member', 'admin')
 def application_detail(request, pk):
     app = get_object_or_404(
@@ -402,22 +422,173 @@ def application_detail(request, pk):
     documents = app.documents.all()
     decisions = app.decisions.select_related('decided_by').all()
 
-    # Hard filter items for display
+    # Hard filter items for display — rich data for farmer-friendly view
     filter_items = []
     if hard_filters:
+        raw = hard_filters.raw_responses or {}
+        giss = raw.get('giss', {})
+        ias = raw.get('ias_rszh', {})
+        egkn = raw.get('egkn', {})
+        is_iszh = raw.get('is_iszh', {})
+        esf = raw.get('is_esf', {})
+        easu = raw.get('easu', {})
+
         filter_items = [
-            ('Регистрация в ГИСС', hard_filters.giss_registered),
-            ('Наличие ЭЦП', hard_filters.has_eds),
-            ('Учётный номер ИАС РСЖ', hard_filters.ias_rszh_registered),
-            ('Земельный участок ЕГКН', hard_filters.has_agricultural_land),
-            ('Регистрация в ИС ИСЖ', hard_filters.is_iszh_registered),
-            ('Регистрация в ИБСПР', hard_filters.ibspr_registered),
-            ('ЭСФ подтверждена', hard_filters.esf_confirmed),
-            ('Нет невыполненных обязательств', hard_filters.no_unfulfilled_obligations),
-            ('Нет блокировки', hard_filters.no_block),
-            ('Возраст животных', hard_filters.animals_age_valid),
-            ('Не субсидировались ранее', hard_filters.animals_not_subsidized),
+            {
+                'name': 'Регистрация в ГИСС',
+                'passed': hard_filters.giss_registered,
+                'icon': 'fa-landmark',
+                'color': 'blue',
+                'system': 'ГИСС',
+                'description': 'Проверяем, зарегистрированы ли вы в Государственной информационной системе субсидирования.',
+                'detail': f'Статус: {"Зарегистрирован" if giss.get("registered") else "Не найден"}',
+                'action': 'Обратитесь в местное управление сельского хозяйства для регистрации в ГИСС.',
+            },
+            {
+                'name': 'Электронная цифровая подпись (ЭЦП)',
+                'passed': hard_filters.has_eds,
+                'icon': 'fa-key',
+                'color': 'purple',
+                'system': 'ЕАСУ',
+                'description': 'Проверяем наличие действующей ЭЦП для подписания документов.',
+                'detail': f'Учётная запись ЕАСУ: {"Активна" if easu.get("has_account_number") else "Не найдена"}',
+                'action': 'Получите ЭЦП в ЦОНе или на сайте НУЦ РК (pki.gov.kz).',
+            },
+            {
+                'name': 'Учётный номер в ИАС «РСЖ»',
+                'passed': hard_filters.ias_rszh_registered,
+                'icon': 'fa-id-card',
+                'color': 'green',
+                'system': 'ИАС РСЖ',
+                'description': 'Проверяем регистрацию в информационно-аналитической системе развития сельского хозяйства.',
+                'detail': f'Регистрация: {"Подтверждена" if ias.get("registered") else "Не найдена"}. {("Учётный номер: " + str(ias.get("account_number", ""))) if ias.get("account_number") else ""}',
+                'action': 'Зарегистрируйтесь в ИАС РСЖ через местное управление сельского хозяйства.',
+            },
+            {
+                'name': 'Земельный участок с/х назначения',
+                'passed': hard_filters.has_agricultural_land,
+                'icon': 'fa-map',
+                'color': 'cyan',
+                'system': 'ЕГКН',
+                'description': 'Проверяем наличие земельного участка сельскохозяйственного назначения в кадастровой базе.',
+                'detail': f'Земля с/х назначения: {"Есть" if egkn.get("has_agricultural_land") else "Не найдена"}. Общая площадь: {egkn.get("total_area", 0)} га',
+                'action': 'Убедитесь, что ваш земельный участок зарегистрирован в ЕГКН. Обратитесь в ЦОН или Земельный комитет.',
+            },
+            {
+                'name': 'Идентификация животных (ИС ИСЖ)',
+                'passed': hard_filters.is_iszh_registered,
+                'icon': 'fa-cow',
+                'color': 'amber',
+                'system': 'ИС ИСЖ',
+                'description': 'Проверяем наличие верифицированных (с биркой) животных в системе идентификации.',
+                'detail': f'Верифицировано животных: {is_iszh.get("total_verified", 0)} из {is_iszh.get("total_animals", 0)}',
+                'action': 'Обратитесь к ветеринарному врачу для идентификации (биркования) ваших животных.',
+            },
+            {
+                'name': 'Регистрация в ИБСПР',
+                'passed': hard_filters.ibspr_registered,
+                'icon': 'fa-building',
+                'color': 'indigo',
+                'system': 'ИАС РСЖ',
+                'description': 'Проверяем регистрацию в интегрированной базе субъектов предпринимательства.',
+                'detail': f'ИБСПР: {"Зарегистрирован" if ias.get("ibspr_registered", ias.get("registered")) else "Не найден"}',
+                'action': 'Регистрация в ИБСПР происходит автоматически через ИАС РСЖ. Обратитесь в управление сельского хозяйства.',
+            },
+            {
+                'name': 'Подтверждение затрат через ЭСФ',
+                'passed': hard_filters.esf_confirmed,
+                'icon': 'fa-file-invoice-dollar',
+                'color': 'pink',
+                'system': 'ИС ЭСФ',
+                'description': 'Проверяем наличие подтверждённых электронных счетов-фактур, подтверждающих ваши расходы.',
+                'detail': f'Всего ЭСФ: {esf.get("invoice_count", 0)}. Подтверждённых: {sum(1 for inv in esf.get("invoices", []) if inv.get("payment_confirmed"))}',
+                'action': 'Убедитесь, что продавец выписал ЭСФ и что она подтверждена в системе ИС ЭСФ (esf.gov.kz).',
+            },
+            {
+                'name': 'Выполнение встречных обязательств',
+                'passed': hard_filters.no_unfulfilled_obligations,
+                'icon': 'fa-handshake',
+                'color': 'teal',
+                'system': 'ГИСС',
+                'description': 'Проверяем, выполнены ли ваши предыдущие обязательства по субсидиям (рост продукции +2%/год).',
+                'detail': f'Обязательства: {"Выполнены" if giss.get("obligations_met") else "Не выполнены" if giss.get("obligations_required") else "Не требуются"}. Рост продукции: {giss.get("growth_rate", "—")}%',
+                'action': 'Выполните встречные обязательства: обеспечьте рост валовой продукции не менее 2% в год.',
+            },
+            {
+                'name': 'Отсутствие блокировки',
+                'passed': hard_filters.no_block,
+                'icon': 'fa-lock-open',
+                'color': 'red',
+                'system': 'ГИСС',
+                'description': 'Проверяем, нет ли блокировки за нарушения (снижение продукции при субсидиях >100 млн ₸).',
+                'detail': f'Блокировка ГИСС: {"Нет" if not giss.get("blocked") else "Заблокирован"}. Блокировка по заявителю: {"Нет" if not app.applicant.is_blocked else "До " + str(app.applicant.block_until)}',
+                'action': 'Блокировка снимается автоматически после истечения срока. При вопросах обратитесь в управление с/х.',
+            },
+            {
+                'name': 'Возраст животных',
+                'passed': hard_filters.animals_age_valid,
+                'icon': 'fa-calendar-check',
+                'color': 'orange',
+                'system': 'ИС ИСЖ',
+                'description': 'Проверяем, что возраст ваших животных соответствует требованиям данного вида субсидии.',
+                'detail': f'Животных в системе: {len(is_iszh.get("animals", []))}. Все в допустимом возрасте: {"Да" if hard_filters.animals_age_valid else "Нет"}',
+                'action': 'Убедитесь, что животные соответствуют возрастным требованиям субсидии. Проверьте данные в ИС ИСЖ.',
+            },
+            {
+                'name': 'Животные не субсидировались ранее',
+                'passed': hard_filters.animals_not_subsidized,
+                'icon': 'fa-ban',
+                'color': 'gray',
+                'system': 'ИС ИСЖ',
+                'description': 'Проверяем, что заявленные животные не получали субсидии ранее (запрет двойного субсидирования).',
+                'detail': f'Ранее субсидированных: {sum(1 for a in is_iszh.get("animals", []) if a.get("previously_subsidized"))} из {len(is_iszh.get("animals", []))}',
+                'action': 'Нельзя получить субсидию на животное повторно. Подайте заявку только на новых животных.',
+            },
         ]
+        # Add extra filters 12-15 if available
+        if hasattr(hard_filters, 'application_period_valid'):
+            filter_items.extend([
+                {
+                    'name': 'Период подачи заявки',
+                    'passed': hard_filters.application_period_valid,
+                    'icon': 'fa-calendar',
+                    'color': 'violet',
+                    'system': 'Приказ №108',
+                    'description': 'Проверяем, что заявка подана в установленный период приёма заявок.',
+                    'detail': f'Дата подачи: {app.submitted_at.strftime("%d.%m.%Y") if app.submitted_at else "—"}',
+                    'action': 'Подайте заявку в период приёма. Сроки уточняйте в управлении сельского хозяйства.',
+                },
+                {
+                    'name': 'Сумма субсидии в пределах нормы',
+                    'passed': hard_filters.subsidy_amount_valid,
+                    'icon': 'fa-calculator',
+                    'color': 'emerald',
+                    'system': 'Приказ №108',
+                    'description': 'Проверяем, что сумма субсидии не превышает 50% стоимости приобретённых животных.',
+                    'detail': f'Запрошенная сумма: {app.total_amount:,.0f} ₸',
+                    'action': 'Уменьшите запрашиваемую сумму до 50% от фактической стоимости животных.',
+                },
+                {
+                    'name': 'Минимальное поголовье',
+                    'passed': hard_filters.min_herd_size_met,
+                    'icon': 'fa-hashtag',
+                    'color': 'lime',
+                    'system': 'Приказ №108',
+                    'description': 'Проверяем, что поголовье соответствует минимальным требованиям для данного типа хозяйства.',
+                    'detail': f'Верифицировано: {is_iszh.get("total_verified", 0)} голов',
+                    'action': 'Увеличьте поголовье до минимальных требований для вашего типа хозяйства.',
+                },
+                {
+                    'name': 'Нет дублирующих заявок',
+                    'passed': hard_filters.no_duplicate_application,
+                    'icon': 'fa-copy',
+                    'color': 'slate',
+                    'system': 'SubsidyAI',
+                    'description': 'Проверяем, что у вас нет уже одобренной заявки на этот же вид субсидии в текущем году.',
+                    'detail': '',
+                    'action': 'Нельзя подать две заявки на один вид субсидии в одном году.',
+                },
+            ])
 
     # External data from emulator
     external_data = {}
@@ -711,7 +882,7 @@ def commission(request):
     scores = (
         Score.objects
         .select_related('application__applicant', 'application__subsidy_type__direction')
-        .filter(application__status__in=['approved', 'waiting_list', 'submitted'])
+        .filter(application__status__in=['approved', 'waiting_list', 'submitted', 'checking'])
         .order_by('-total_score')
     )
 
@@ -1545,6 +1716,9 @@ def api_entity_data(request, iin_bin):
             for i, inv in enumerate(is_esf.get('invoices', []))
         ],
         'accounts': (entity.easu_data or {}).get('account_numbers', []),
+        # СПК данные (ШАГ 9 AS-IS)
+        'spk_name': (entity.easu_data or {}).get('spk_name', ''),
+        'spk_members': (entity.easu_data or {}).get('spk_members', []),
         # Предварительные проверки (hard filters preview)
         'checks': {
             'giss_registered': giss.get('registered', False),
@@ -1553,6 +1727,7 @@ def api_entity_data(request, iin_bin):
             'has_land': egkn.get('has_agricultural_land', False),
             'not_blocked': not giss.get('blocked', False),
             'obligations_met': giss.get('obligations_met', True),
+            'block_reason': giss.get('block_reason', ''),
         },
     })
 
