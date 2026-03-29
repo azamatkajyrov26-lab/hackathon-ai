@@ -372,6 +372,30 @@
                 </div>
                 {% endif %}
 
+                <!-- SHAP Waterfall -->
+                {% if shap_data %}
+                <div class="mb-6 p-4 rounded-xl bg-white border border-gray-200">
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+                        <i class="fas fa-chart-bar mr-1"></i> SHAP — вклад факторов в оценку
+                    </h4>
+                    <p class="text-[11px] text-gray-400 mb-4">Базовое значение модели: {{ shap_data.base_value }} баллов. Зелёный — повышает оценку, красный — снижает.</p>
+                    <div class="space-y-2">
+                        {% for item in shap_data.items %}
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs text-gray-600 w-44 text-right truncate flex-shrink-0" title="{{ item.feature_ru }}">{{ item.feature_ru }}</span>
+                            <div class="flex-1 h-5 relative flex items-center">
+                                <div style="width: {{ item.bar_pct }}%; min-width: 4px;"
+                                     class="h-full rounded {% if item.direction == 'positive' %}bg-green-400{% else %}bg-red-400{% endif %} transition-all duration-500"></div>
+                            </div>
+                            <span class="text-xs font-mono w-16 text-right flex-shrink-0 {% if item.direction == 'positive' %}text-green-700{% else %}text-red-600{% endif %}">
+                                {% if item.shap_value >= 0 %}+{% endif %}{{ item.shap_value }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
                 <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Детализация по {{ factors|length }} факторам</h4>
                 <div class="space-y-4">
                     {% for factor in factors %}

@@ -363,6 +363,63 @@ def _compute_feature_contributions(features: np.ndarray) -> list[dict]:
     return result[:10]  # Топ-10 факторов
 
 
+def explain_with_shap(features_dict: dict) -> dict | None:
+    """
+    Вычисляет SHAP-значения для одной заявки с помощью TreeExplainer.
+
+    Args:
+        features_dict: словарь entity_data (как для extract_features)
+
+    Returns:
+        dict с shap_values, base_value, feature_names — или None при ошибке/отсутствии shap
+    """
+    try:
+        import shap
+    except ImportError:
+        logger.info('shap не установлен — SHAP-объяснение недоступно')
+        return None
+
+    if not _load_models():
+        return None
+
+    try:
+        features = extract_features(features_dict)
+        X = features.reshape(1, -1)
+
+        explainer = shap.TreeExplainer(_score_model)
+        shap_values = explainer.shap_values(X)
+
+        # shap_values может быть (1, n_features) или (n_features,)
+        sv = np.array(shap_values).flatten() if np.array(shap_values).ndim > 1 else np.array(shap_values)
+        if sv.shape[0] > len(FEATURE_NAMES):
+            sv = sv[:len(FEATURE_NAMES)]
+
+        # expected_value может быть скаляр или массив
+        ev = explainer.expected_value
+        base_value = float(ev) if np.ndim(ev) == 0 else float(ev[0])
+
+        # Собираем результат: список (feature_name_ru, shap_value) отсортированный по |shap|
+        items = []
+        for i, val in enumerate(sv):
+            items.append({
+                'feature': FEATURE_NAMES[i],
+                'feature_ru': FEATURE_NAMES_RU.get(FEATURE_NAMES[i], FEATURE_NAMES[i]),
+                'shap_value': round(float(val), 4),
+                'feature_value': round(float(features[i]), 4),
+            })
+
+        # Сортировка по абсолютному значению SHAP (убывание)
+        items.sort(key=lambda x: abs(x['shap_value']), reverse=True)
+
+        return {
+            'shap_values': items,
+            'base_value': round(base_value, 2),
+        }
+    except Exception as e:
+        logger.warning('Ошибка вычисления SHAP: %s', e)
+        return None
+
+
 def get_model_info() -> dict | None:
     """Возвращает метаданные обученной модели."""
     if not _load_models():

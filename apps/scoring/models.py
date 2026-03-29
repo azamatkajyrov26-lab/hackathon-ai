@@ -102,6 +102,25 @@ class SubsidyType(models.Model):
         return f'{self.name} ({self.rate} тг/{self.unit})'
 
 
+class ApplicationPeriod(models.Model):
+    """Сроки приёма заявок по направлениям (настраиваемые через админку)."""
+    direction = models.OneToOneField(SubsidyDirection, on_delete=models.CASCADE, related_name='period')
+    start_day = models.IntegerField('День начала', default=1)
+    start_month = models.IntegerField('Месяц начала', default=1)
+    end_day = models.IntegerField('День окончания', default=31)
+    end_month = models.IntegerField('Месяц окончания', default=12)
+    is_year_round = models.BooleanField('Круглогодичный приём', default=True)
+
+    class Meta:
+        verbose_name = 'Срок приёма заявок'
+        verbose_name_plural = 'Сроки приёма заявок'
+
+    def __str__(self):
+        if self.is_year_round:
+            return f'{self.direction.name} — круглый год'
+        return f'{self.direction.name} — {self.start_day:02d}.{self.start_month:02d} – {self.end_day:02d}.{self.end_month:02d}'
+
+
 class Application(models.Model):
     STATUS_CHOICES = [
         ('draft', 'Черновик'),
@@ -197,6 +216,10 @@ class HardFilterResult(models.Model):
     no_block = models.BooleanField('Нет блокировки', default=False)
     animals_age_valid = models.BooleanField('Возраст', default=False)
     animals_not_subsidized = models.BooleanField('Не субсидировались', default=False)
+    application_period_valid = models.BooleanField('Срок подачи', default=False)
+    subsidy_amount_valid = models.BooleanField('Лимит суммы', default=False)
+    min_herd_size_met = models.BooleanField('Мин. поголовье', default=False)
+    no_duplicate_application = models.BooleanField('Нет дубликатов', default=False)
     all_passed = models.BooleanField('Все пройдены', default=False)
     failed_reasons = models.JSONField('Причины отказа', default=list)
     checked_at = models.DateTimeField(auto_now_add=True)
@@ -223,6 +246,7 @@ class Score(models.Model):
     rank = models.IntegerField('Позиция в рейтинге', null=True, blank=True)
     recommendation = models.CharField('Рекомендация', max_length=10, choices=RECOMMENDATION_CHOICES)
     recommendation_reason = models.TextField('Обоснование')
+    explanation = models.JSONField('SHAP-объяснение', default=dict, blank=True)
     calculated_at = models.DateTimeField(auto_now_add=True)
     model_version = models.CharField('Версия модели', max_length=20, default='1.0')
 

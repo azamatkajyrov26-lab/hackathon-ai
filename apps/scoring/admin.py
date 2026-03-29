@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import (
     UserProfile, Applicant, SubsidyDirection, SubsidyType,
     Application, ApplicationDocument, HardFilterResult,
-    Score, ScoreFactor, Decision, Budget,
+    Score, ScoreFactor, Decision, Budget, ApplicationPeriod,
 )
 
 
@@ -101,3 +101,10 @@ class BudgetAdmin(admin.ModelAdmin):
     list_display = ('year', 'region', 'direction', 'planned_amount', 'spent_amount')
     list_filter = ('year', 'region', 'direction')
     search_fields = ('region', 'direction__name')
+
+
+@admin.register(ApplicationPeriod)
+class ApplicationPeriodAdmin(admin.ModelAdmin):
+    list_display = ('direction', 'is_year_round', 'start_day', 'start_month', 'end_day', 'end_month')
+    list_filter = ('is_year_round',)
+    search_fields = ('direction__name',)

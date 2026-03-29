@@ -501,6 +501,19 @@ def application_detail(request, pk):
             'trend': trend,
         }
 
+    # SHAP explanation data
+    shap_data = None
+    if score and score.explanation and score.explanation.get('shap_values'):
+        shap_items = score.explanation['shap_values'][:10]  # Top 10 factors
+        max_abs = max((abs(item['shap_value']) for item in shap_items), default=1) or 1
+        for item in shap_items:
+            item['bar_pct'] = round(abs(item['shap_value']) / max_abs * 100, 1)
+            item['direction'] = 'positive' if item['shap_value'] >= 0 else 'negative'
+        shap_data = {
+            'items': shap_items,
+            'base_value': score.explanation.get('base_value', 0),
+        }
+
     return render(request, 'scoring/application_detail.html', {
         'app': app,
         'score': score,
@@ -516,6 +529,7 @@ def application_detail(request, pk):
         'budget_info': budget_info,
         'applicant_history': applicant_history,
         'history_summary': history_summary,
+        'shap_data': shap_data,
     })
 
 

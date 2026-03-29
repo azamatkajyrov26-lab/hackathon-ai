@@ -4,7 +4,7 @@ Covers ALL agricultural subsidy directions in Kazakhstan (not just livestock).
 """
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
-from apps.scoring.models import SubsidyDirection, SubsidyType, Budget, UserProfile
+from apps.scoring.models import SubsidyDirection, SubsidyType, Budget, UserProfile, ApplicationPeriod
 
 
 DIRECTIONS = [
@@ -210,6 +210,38 @@ class Command(BaseCommand):
         for code, name in DIRECTIONS:
             SubsidyDirection.objects.update_or_create(code=code, defaults={'name': name})
         self.stdout.write(f'Created {len(DIRECTIONS)} directions')
+
+        # Application Periods (настраиваемые сроки приёма заявок)
+        PERIODS = {
+            # Скотоводство: 1 января — 31 декабря (расширено для демо)
+            'cattle_meat': (1, 1, 12, 31, False),
+            'cattle_dairy': (1, 1, 12, 31, False),
+            'cattle_general': (1, 1, 12, 31, False),
+            # Овцеводство: расширено
+            'sheep': (1, 1, 12, 31, False),
+            # Остальные — круглый год
+        }
+        period_count = 0
+        for direction in SubsidyDirection.objects.all():
+            period_data = PERIODS.get(direction.code)
+            if period_data:
+                sm, sd, em, ed, yr = period_data
+                ApplicationPeriod.objects.update_or_create(
+                    direction=direction,
+                    defaults={
+                        'start_month': sm, 'start_day': sd,
+                        'end_month': em, 'end_day': ed,
+                        'is_year_round': yr,
+                    },
+                )
+                period_count += 1
+            else:
+                ApplicationPeriod.objects.update_or_create(
+                    direction=direction,
+                    defaults={'is_year_round': True},
+                )
+                period_count += 1
+        self.stdout.write(f'Created {period_count} application periods')
 
         # Types
         created = 0

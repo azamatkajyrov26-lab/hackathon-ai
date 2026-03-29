@@ -32,7 +32,7 @@ services:
       - media_files:/app/media
       - ml_models:/app/apps/scoring/ml_models
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       - DEBUG=${DEBUG:-1}
       - SECRET_KEY=${SECRET_KEY:-hackathon-dev-secret-key}

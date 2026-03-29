@@ -5,7 +5,7 @@ from django.db import transaction
 
 from apps.emulator.models import EmulatedEntity
 from apps.scoring.hard_filters import HardFilterChecker
-from apps.scoring.ml_model import predict_score, extract_features
+from apps.scoring.ml_model import predict_score, extract_features, explain_with_shap
 from apps.scoring.models import Application, Score, ScoreFactor, Budget, Notification
 from apps.scoring.soft_factors import SoftFactorCalculator
 
@@ -135,6 +135,7 @@ class ScoringEngine:
 
         # --- Шаг 4.1: ML-предсказание ---
         ml_result = predict_score(entity_data)
+        shap_explanation = {}
         if ml_result:
             # Гибридный скоринг: 60% ML + 40% правила
             ml_score = ml_result['ml_score']
@@ -146,6 +147,13 @@ class ScoringEngine:
                 'ML предсказание: %.2f (уверенность %.1f%%), правила: %.2f → итого: %.2f',
                 ml_score, ml_confidence * 100, rule_score, total_score,
             )
+
+            # --- SHAP explainability ---
+            shap_result = explain_with_shap(entity_data)
+            if shap_result:
+                shap_explanation = shap_result
+                logger.info('SHAP-объяснение вычислено: base=%.2f, %d факторов',
+                            shap_result['base_value'], len(shap_result['shap_values']))
         else:
             # Fallback: только правила
             total_score = rule_score
@@ -171,6 +179,7 @@ class ScoringEngine:
                     'total_score': Decimal(str(total_score)),
                     'recommendation': recommendation,
                     'recommendation_reason': recommendation_reason,
+                    'explanation': shap_explanation,
                     'model_version': MODEL_VERSION,
                 },
             )
