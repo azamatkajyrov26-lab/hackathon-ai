@@ -22,8 +22,12 @@ urlpatterns = [
     path('notifications/', views.notifications_view, name='notifications'),
     path('notifications/<int:pk>/read/', views.notification_read, name='notification_read'),
     path('api/entity-data/<str:iin_bin>/', views.api_entity_data, name='api_entity_data'),
+    path('api/rfid-status/<str:iin_bin>/', views.api_rfid_status, name='api_rfid_status'),
+    path('api/save-land-polygons/', views.api_save_land_polygons, name='api_save_land_polygons'),
+    path('rfid-dashboard/', views.rfid_dashboard, name='rfid_dashboard'),
     path('model-info/', views.model_info_view, name='model_info'),
     path('api/form-progress/', views.api_form_progress, name='api_form_progress'),
     path('my-farm/', views.farmer_dashboard, name='farmer_dashboard'),
+    path('my-analytics/', views.farmer_analytics, name='farmer_analytics'),
     path('audit-log/', views.audit_log_view, name='audit_log'),
 ]

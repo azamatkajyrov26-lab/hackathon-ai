@@ -3,12 +3,13 @@ Generate synthetic EmulatedEntity data from Excel + random generation.
 Creates entities with realistic data for all 7 external system APIs.
 """
 import random
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 from faker import Faker
 
-from apps.emulator.models import EmulatedEntity
+from apps.emulator.models import EmulatedEntity, RFIDMonitoring
 from apps.scoring.models import SubsidyDirection
 
 fake = Faker('ru_RU')
@@ -130,6 +131,33 @@ class Command(BaseCommand):
                 treasury_data=self._gen_treasury(risk),
             )
             entity.save()
+
+            # Create RFIDMonitoring records for animals with RFID
+            rfid_locations = ['Ворота загона', 'Поилка №1', 'Поилка №2', 'Кормушка', 'Доильный зал', 'Пастбище']
+            rfid_readers = ['Панельный UHF', 'Станция на поилке', 'Ручной ридер', 'Станция на кормушке']
+            for animal in (entity.is_iszh_data or {}).get('animals', []):
+                if animal.get('rfid_tag'):
+                    scan_dt = timezone.now() - timedelta(days=random.randint(0, 30))
+                    if animal.get('rfid_active'):
+                        status = 'active'
+                    elif animal.get('rfid_scan_count_30d', 0) == 0:
+                        status = 'missing'
+                    else:
+                        status = 'inactive'
+                    RFIDMonitoring.objects.update_or_create(
+                        entity=entity,
+                        animal_tag=animal['tag_number'],
+                        defaults={
+                            'rfid_tag': animal['rfid_tag'],
+                            'last_scan_date': scan_dt,
+                            'scan_location': random.choice(rfid_locations),
+                            'status': status,
+                            'scan_count_30d': animal.get('rfid_scan_count_30d', 0),
+                            'animal_type': animal.get('type', ''),
+                            'reader_type': random.choice(rfid_readers),
+                        },
+                    )
+
             created += 1
 
             if created % 100 == 0:
@@ -235,6 +263,31 @@ class Command(BaseCommand):
             age = random.randint(4, 24)
             age_valid = 6 <= age <= 18
 
+            # RFID data
+            has_rfid = random.random() > 0.2  # 80% animals have RFID
+            rfid_tag = f'RFID-{random.randint(1000000, 9999999)}' if has_rfid else None
+            if has_rfid:
+                if risk == 'clean':
+                    rfid_active = True
+                    rfid_scan_count = random.randint(20, 60)
+                    rfid_last_scan = (date.today() - timedelta(days=random.randint(0, 3))).isoformat()
+                elif risk == 'minor_issues':
+                    rfid_active = random.random() > 0.2
+                    rfid_scan_count = random.randint(5, 30)
+                    rfid_last_scan = (date.today() - timedelta(days=random.randint(1, 14))).isoformat()
+                elif risk == 'risky':
+                    rfid_active = random.random() > 0.5
+                    rfid_scan_count = random.randint(0, 10)
+                    rfid_last_scan = (date.today() - timedelta(days=random.randint(7, 45))).isoformat()
+                else:  # fraudulent
+                    rfid_active = random.random() > 0.7
+                    rfid_scan_count = random.randint(0, 3)
+                    rfid_last_scan = (date.today() - timedelta(days=random.randint(30, 90))).isoformat()
+            else:
+                rfid_active = False
+                rfid_scan_count = 0
+                rfid_last_scan = None
+
             animals.append({
                 'tag_number': f'KZ{random.randint(10000000, 99999999)}',
                 'type': animal_type,
@@ -250,6 +303,10 @@ class Command(BaseCommand):
                 'vet_status': 'healthy' if risk != 'risky' else random.choice(['healthy', 'quarantine']),
                 'last_vet_check': (date.today() - timedelta(days=random.randint(1, 90))).isoformat(),
                 'registration_date': (date.today() - timedelta(days=random.randint(30, 365))).isoformat(),
+                'rfid_tag': rfid_tag,
+                'rfid_active': rfid_active,
+                'rfid_last_scan': rfid_last_scan,
+                'rfid_scan_count_30d': rfid_scan_count,
             })
 
         rejected = sum(1 for a in animals if not a['age_valid'] or a['previously_subsidized'])

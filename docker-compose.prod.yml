@@ -28,7 +28,7 @@ services:
       - media_files:/app/media
       - ml_models:/app/apps/scoring/ml_models
     ports:
-      - "8080:8000"
+      - "8001:8000"
     env_file:
       - .env
     depends_on:

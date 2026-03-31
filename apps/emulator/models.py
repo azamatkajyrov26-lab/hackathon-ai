@@ -38,3 +38,33 @@ class EmulatedEntity(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.iin_bin}) [{self.risk_profile}]'
+
+
+class RFIDMonitoring(models.Model):
+    """RFID-мониторинг сохранности животных на ферме."""
+    STATUS_CHOICES = [
+        ('active', 'Активна'),
+        ('inactive', 'Неактивна — давно не считывалась'),
+        ('missing', 'Не найдена'),
+    ]
+
+    entity = models.ForeignKey(EmulatedEntity, on_delete=models.CASCADE, related_name='rfid_records')
+    animal_tag = models.CharField('Бирка животного', max_length=50, db_index=True)
+    rfid_tag = models.CharField('RFID-метка', max_length=100)
+    last_scan_date = models.DateTimeField('Последнее считывание')
+    scan_location = models.CharField('Место считывания', max_length=200)
+    status = models.CharField('Статус', max_length=20, choices=STATUS_CHOICES, default='active')
+    scan_count_30d = models.IntegerField('Считываний за 30 дней', default=0)
+    animal_type = models.CharField('Вид животного', max_length=50, blank=True)
+    reader_type = models.CharField('Тип считывателя', max_length=50, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'RFID-мониторинг'
+        verbose_name_plural = 'RFID-мониторинг'
+        ordering = ['-last_scan_date']
+        unique_together = [('entity', 'animal_tag')]
+
+    def __str__(self):
+        return f'RFID {self.rfid_tag} → {self.animal_tag} ({self.get_status_display()})'

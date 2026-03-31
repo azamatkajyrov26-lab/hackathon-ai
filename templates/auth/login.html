@@ -451,28 +451,28 @@ document.getElementById('ecp-form').addEventListener('submit', function(e) {
     }, 800);
 });
 
-/* ── Load demo IINs from emulator API ── */
-fetch('/api/emulator/entities/?page_size=6&format=json')
-    .then(r => r.json())
-    .then(data => {
-        const grid = document.getElementById('demo-ecp-grid');
-        const entities = data.results || data || [];
-        entities.forEach(function(e) {
-            const div = document.createElement('div');
-            div.className = 'demo-item';
-            div.onclick = function() { fillEcp(e.iin_bin); };
-            div.innerHTML =
-                '<span class="demo-role">' + (e.entity_type === 'individual' ? 'Физ. лицо' : e.entity_type === 'legal' ? 'Юр. лицо' : 'СПК') + '</span>' +
-                '<span class="demo-cred">' + (e.name || '').substring(0, 25) + '</span>' +
-                '<span class="demo-iin">' + e.iin_bin + '</span>';
-            grid.appendChild(div);
-        });
-    })
-    .catch(function() {
-        // Fallback if API unavailable
-        const grid = document.getElementById('demo-ecp-grid');
-        grid.innerHTML = '<p style="font-size:.8rem;color:#9CA3AF;grid-column:1/-1">API эмулятора недоступен</p>';
+/* ── Demo applicant IINs (hardcoded personas) ── */
+(function() {
+    const demos = [
+        { iin: '950315400123', name: 'ИП Абрамова С.', desc: 'Новенькая, ничего нет', result: 'ОТКАЗ', color: '#DC2626' },
+        { iin: '880720300456', name: 'СПК "Береке Астана"', desc: 'Опытный, СПК, 8 голов', result: 'ОДОБРЕНИЕ', color: '#16A34A' },
+        { iin: '901105200789', name: 'КХ "Жумабаев Н."', desc: 'Готов к подаче, 3 головы', result: 'ОДОБРЕНИЕ', color: '#16A34A' },
+        { iin: '850930100234', name: 'ТОО "Дала Агро"', desc: 'Заблокирован в ГИСС', result: 'ОТКАЗ', color: '#DC2626' },
+        { iin: '920812500567', name: 'ИП Тастемирова А.', desc: 'Импортный скот', result: 'ОДОБРЕНИЕ', color: '#16A34A' },
+        { iin: '870325100890', name: 'КХ "Оспанов"', desc: 'Частичные проблемы', result: 'РАССМОТРЕНИЕ', color: '#D97706' },
+    ];
+    const grid = document.getElementById('demo-ecp-grid');
+    demos.forEach(function(d) {
+        const div = document.createElement('div');
+        div.className = 'demo-item';
+        div.onclick = function() { fillEcp(d.iin); };
+        div.innerHTML =
+            '<span class="demo-role">' + d.name + '</span>' +
+            '<span class="demo-iin">' + d.iin + '</span>' +
+            '<span style="font-size:.68rem;color:' + d.color + ';font-weight:700;margin-top:2px">' + d.result + ' — ' + d.desc + '</span>';
+        grid.appendChild(div);
     });
+})();
 
 /* ── IIN input: only digits ── */
 document.getElementById('iin_bin').addEventListener('input', function(e) {

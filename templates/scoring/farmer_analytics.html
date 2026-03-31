@@ -1,0 +1,523 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block page_title %}Моя аналитика{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+    .rec-card { border-radius: 16px; padding: 24px; position: relative; overflow: hidden; }
+    .rec-approve { background: linear-gradient(135deg, #065F46, #047857); color: #fff; }
+    .rec-review { background: linear-gradient(135deg, #92400E, #B45309); color: #fff; }
+    .rec-reject { background: linear-gradient(135deg, #991B1B, #DC2626); color: #fff; }
+    .rec-card .rec-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; }
+    .rec-card .rec-text { font-size: 24px; font-weight: 800; margin-top: 4px; }
+    .rec-card .rec-reason { font-size: 13px; opacity: 0.85; margin-top: 12px; line-height: 1.6; }
+    .rec-card .rec-icon { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 64px; opacity: 0.1; }
+
+    .score-ring { width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; flex-shrink: 0; }
+    .score-ring .score-num { font-size: 32px; font-weight: 800; line-height: 1; }
+    .score-ring .score-of { font-size: 11px; opacity: 0.6; }
+
+    .factor-bar { height: 8px; border-radius: 4px; background: #F3F4F6; overflow: hidden; }
+    .factor-fill { height: 100%; border-radius: 4px; transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    .budget-bar { height: 10px; border-radius: 5px; background: #F3F4F6; overflow: hidden; }
+    .budget-fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, #C1FF00, #8BC500); transition: width 0.6s; }
+
+    .timeline-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .timeline-line { width: 2px; flex: 1; background: #E5E7EB; }
+
+    .tab-btn { padding: 10px 16px; font-size: 14px; transition: all 0.2s; white-space: nowrap; margin-bottom: -1px; }
+    .tab-btn.active { border-bottom: 2px solid #C1FF00; color: #111827; font-weight: 600; }
+    .tab-btn:not(.active) { color: #6B7280; }
+    .tab-btn:not(.active):hover { color: #374151; }
+
+    .esf-row { cursor: pointer; transition: background 0.15s; }
+    .esf-row:hover { background: #FAFFF0; }
+
+    .blocked-banner { background: linear-gradient(135deg, #991B1B, #DC2626); color: #fff; border-radius: 12px; padding: 16px 20px; }
+
+    @media (max-width: 640px) {
+        .rec-card { padding: 16px; }
+        .rec-card .rec-text { font-size: 16px; }
+        .rec-card .rec-reason { font-size: 12px; }
+        .rec-card .rec-icon { font-size: 40px; right: 10px; }
+        .score-ring { width: 72px; height: 72px; }
+        .score-ring .score-num { font-size: 24px; }
+        .score-ring .score-of { font-size: 9px; }
+        .tab-btn { padding: 8px 12px; font-size: 13px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if not entity %}
+<div class="fade-in">
+    <div class="card-glass p-8 text-center">
+        <i class="fas fa-chart-bar text-6xl text-gray-300 mb-4"></i>
+        <h2 class="text-xl font-bold text-gray-700 mb-2">Данные хозяйства не найдены</h2>
+        <p class="text-gray-500 mb-4">Ваш профиль не связан с данными в государственных системах. Обратитесь к администратору для привязки ИИН/БИН.</p>
+        <a href="/dashboard/" class="btn-lime px-6 py-2 rounded-lg inline-block">Вернуться на дашборд</a>
+    </div>
+</div>
+{% else %}
+<div class="fade-in space-y-6">
+
+    <!-- ======== BACK LINK ======== -->
+    <div>
+        <a href="/my-farm/" class="inline-flex items-center gap-2 text-gray-500 hover:text-gray-800 text-sm transition-colors">
+            <i class="fas fa-arrow-left"></i> Мое хозяйство
+        </a>
+    </div>
+
+    <!-- ======== PRE-SCORING TRAFFIC LIGHT ======== -->
+    {% if pre_score %}
+    <div class="rec-card {{ pre_score.rec_class }} slide-up">
+        <div class="rec-label">Предварительная оценка хозяйства</div>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div class="score-ring border-4 {% if pre_score.total >= 70 %}border-green-300{% elif pre_score.total >= 40 %}border-yellow-300{% else %}border-red-300{% endif %}" style="background: rgba(255,255,255,0.15);">
+                <span class="score-num text-white">{{ pre_score.total|floatformat:0 }}</span>
+                <span class="score-of text-white/60">из 100</span>
+            </div>
+            <div class="flex-1">
+                <div class="rec-text">{{ pre_score.recommendation }}</div>
+                {% if pre_score.weak_areas %}
+                <div class="rec-reason">
+                    <div class="font-semibold mb-1" style="opacity: 0.9;">Слабые стороны:</div>
+                    <ul class="list-disc list-inside space-y-0.5">
+                        {% for area in pre_score.weak_areas %}
+                        <li>{{ area }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                <div class="text-xs mt-3" style="opacity: 0.5;">Предварительная оценка — итоговый балл зависит от конкретной заявки</div>
+            </div>
+        </div>
+        <div class="rec-icon">
+            {% if pre_score.rec_class == 'rec-approve' %}<i class="fas fa-check-circle"></i>
+            {% elif pre_score.rec_class == 'rec-review' %}<i class="fas fa-search"></i>
+            {% else %}<i class="fas fa-times-circle"></i>{% endif %}
+        </div>
+    </div>
+
+    <!-- Pre-score factors -->
+    {% if pre_score.factors %}
+    <div class="card-glass p-5">
+        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="fas fa-chart-bar mr-1"></i> Факторы предварительной оценки</h3>
+        <div class="space-y-3">
+            {% for factor in pre_score.factors %}
+            <div class="p-3 bg-gray-50 rounded-xl">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-semibold text-gray-800">{{ factor.name }}</span>
+                    <div class="text-sm">
+                        <span class="font-mono font-bold {% if factor.status == 'good' %}text-green-600{% elif factor.status == 'warning' %}text-yellow-600{% else %}text-red-600{% endif %}">{{ factor.value|floatformat:1 }}</span>
+                        <span class="text-gray-400">/ {{ factor.max_value|floatformat:0 }}</span>
+                    </div>
+                </div>
+                <div class="factor-bar">
+                    <div class="factor-fill {% if factor.status == 'good' %}bg-green-400{% elif factor.status == 'warning' %}bg-yellow-400{% else %}bg-red-400{% endif %}"
+                         style="width: {{ factor.percentage|floatformat:0 }}%"></div>
+                </div>
+                {% if factor.explanation %}
+                <p class="text-xs text-gray-500 mt-2">{{ factor.explanation }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- ======== TABS ======== -->
+    <div x-data="{ tab: 'history' }">
+        <div class="flex gap-1 overflow-x-auto border-b border-gray-200 pb-0 -mx-4 px-4 sm:mx-0 sm:px-0" style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
+            <button @click="tab = 'history'" :class="tab === 'history' ? 'border-b-2 border-lime-400 text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="tab-btn"><i class="fas fa-clock-rotate-left mr-1"></i>Субсидии</button>
+            <button @click="tab = 'obligations'" :class="tab === 'obligations' ? 'border-b-2 border-lime-400 text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="tab-btn"><i class="fas fa-handshake mr-1"></i>Обязательства</button>
+            <button @click="tab = 'esf'" :class="tab === 'esf' ? 'border-b-2 border-lime-400 text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="tab-btn"><i class="fas fa-file-invoice mr-1"></i>Счёт-фактуры</button>
+            <button @click="tab = 'finance'" :class="tab === 'finance' ? 'border-b-2 border-lime-400 text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="tab-btn"><i class="fas fa-wallet mr-1"></i>Финансы</button>
+        </div>
+
+        <!-- ==================== TAB: SUBSIDY HISTORY ==================== -->
+        <div x-show="tab === 'history'" x-cloak class="slide-up mt-4 space-y-4">
+            {% if subsidy_history %}
+            <div class="card-glass p-6">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="fas fa-clock-rotate-left mr-1"></i> История получения субсидий</h3>
+                <div class="space-y-3">
+                    {% for item in subsidy_history %}
+                    <div class="flex gap-4 p-4 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
+                        <div class="flex flex-col items-center gap-1">
+                            <div class="timeline-dot {% if item.status == 'executed' %}bg-green-400{% elif item.status == 'pending' %}bg-yellow-400{% else %}bg-red-400{% endif %}"></div>
+                            {% if not forloop.last %}<div class="timeline-line"></div>{% endif %}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-lg font-bold text-gray-800">{{ item.year }}</span>
+                                    {% if item.status == 'executed' %}
+                                    <span class="badge-success text-xs px-2 py-0.5 rounded-md">Исполнено</span>
+                                    {% elif item.status == 'pending' %}
+                                    <span class="badge-warning text-xs px-2 py-0.5 rounded-md">В процессе</span>
+                                    {% elif item.status == 'returned' %}
+                                    <span class="badge-error text-xs px-2 py-0.5 rounded-md">Возврат</span>
+                                    {% else %}
+                                    <span class="badge-info text-xs px-2 py-0.5 rounded-md">{{ item.status }}</span>
+                                    {% endif %}
+                                </div>
+                                <span class="font-mono font-bold text-gray-800">{{ item.amount|floatformat:0|intcomma }} тг</span>
+                            </div>
+                            <div class="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
+                                <span><i class="fas fa-tag mr-1"></i>{{ item.type }}</span>
+                                <span><i class="fas fa-hashtag mr-1"></i>{{ item.heads }} голов</span>
+                                <span>
+                                    {% if item.obligations_met %}
+                                    <i class="fas fa-check-circle text-green-500 mr-1"></i>Обязательства выполнены
+                                    {% else %}
+                                    <i class="fas fa-times-circle text-red-500 mr-1"></i>Обязательства не выполнены
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="card-glass p-6 text-center">
+                <p class="text-gray-400 text-sm py-4"><i class="fas fa-inbox text-2xl mb-2 block"></i>Вы ещё не получали субсидий</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ==================== TAB: OBLIGATIONS ==================== -->
+        <div x-show="tab === 'obligations'" x-cloak class="slide-up mt-4 space-y-4">
+
+            {% if giss_data.blocked %}
+            <div class="blocked-banner flex items-center gap-3">
+                <i class="fas fa-ban text-3xl"></i>
+                <div>
+                    <div class="font-bold text-lg">Субъект заблокирован</div>
+                    <div class="text-sm opacity-80">Получение субсидий приостановлено. Обратитесь в МИО для разъяснений.</div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Total subsidies & threshold -->
+            <div class="card-glass p-6">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="fas fa-landmark mr-1"></i> Общий объём полученных субсидий</h3>
+                <div class="text-3xl font-bold text-gray-800 mb-3">{{ giss_data.total_subsidies_received|floatformat:0|intcomma }} тг</div>
+
+                {% with threshold=100000000 %}
+                <div class="budget-bar mb-2">
+                    {% if giss_data.total_subsidies_received >= threshold %}
+                    <div class="budget-fill" style="width: 100%; background: linear-gradient(90deg, #DC2626, #991B1B);"></div>
+                    {% else %}
+                    <div class="budget-fill" style="width: {% widthratio giss_data.total_subsidies_received threshold 100 %}%"></div>
+                    {% endif %}
+                </div>
+                <div class="flex justify-between text-xs text-gray-500">
+                    <span>Порог контр-обязательств: 100 000 000 тг</span>
+                    {% if giss_data.total_subsidies_received >= threshold %}
+                    <span class="font-bold text-red-600">ПОРОГ ПРОЙДЕН</span>
+                    {% else %}
+                    <span>Осталось: {{ threshold|add:giss_data.total_subsidies_received|floatformat:0|intcomma }} тг</span>
+                    {% endif %}
+                </div>
+                {% endwith %}
+            </div>
+
+            <!-- Obligations status -->
+            <div class="card-glass p-6">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="fas fa-clipboard-check mr-1"></i> Статус обязательств</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="p-4 rounded-xl {% if giss_data.obligations_met %}bg-green-50 border border-green-200{% else %}bg-red-50 border border-red-200{% endif %}">
+                        <div class="flex items-center gap-3">
+                            {% if giss_data.obligations_met %}
+                            <div class="w-10 h-10 rounded-full bg-green-200 flex items-center justify-center"><i class="fas fa-check text-green-700"></i></div>
+                            <div>
+                                <div class="font-bold text-green-800">Обязательства выполнены</div>
+                                <div class="text-xs text-green-600">Все условия соблюдены</div>
+                            </div>
+                            {% else %}
+                            <div class="w-10 h-10 rounded-full bg-red-200 flex items-center justify-center"><i class="fas fa-xmark text-red-700"></i></div>
+                            <div>
+                                <div class="font-bold text-red-800">Обязательства не выполнены</div>
+                                <div class="text-xs text-red-600">Требуется исполнение условий</div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-gray-50 border border-gray-200">
+                        <div class="text-xs text-gray-500 mb-1">Требуются обязательства</div>
+                        <div class="text-lg font-bold text-gray-800">{% if giss_data.obligations_required %}Да{% else %}Нет{% endif %}</div>
+                        {% if giss_data.repeat_violation %}
+                        <div class="mt-1"><span class="badge-error text-xs px-2 py-0.5 rounded-md"><i class="fas fa-exclamation-triangle mr-1"></i>Повторное нарушение</span></div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Growth rate & production -->
+            <div class="card-glass p-6">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="fas fa-chart-line mr-1"></i> Валовая продукция и рост</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="p-4 rounded-xl bg-gray-50 border border-gray-200 text-center">
+                        <div class="text-xs text-gray-500 mb-1">Темп роста</div>
+                        <div class="text-2xl font-bold {% if giss_data.growth_rate > 0 %}text-green-600{% elif giss_data.growth_rate < 0 %}text-red-600{% else %}text-gray-600{% endif %}">
+                            {% if giss_data.growth_rate > 0 %}+{% endif %}{{ giss_data.growth_rate|floatformat:1 }}%
+                        </div>
+                        <div class="mt-1">
+                            {% if giss_data.growth_rate > 0 %}
+                            <span class="badge-success text-[10px] px-2 py-0.5 rounded-md"><i class="fas fa-arrow-up mr-0.5"></i>Рост</span>
+                            {% elif giss_data.growth_rate < 0 %}
+                            <span class="badge-error text-[10px] px-2 py-0.5 rounded-md"><i class="fas fa-arrow-down mr-0.5"></i>Снижение</span>
+                            {% else %}
+                            <span class="badge-info text-[10px] px-2 py-0.5 rounded-md">Без изменений</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="p-4 rounded-xl bg-gray-50 border border-gray-200 text-center">
+                        <div class="text-xs text-gray-500 mb-1">Валовая продукция (прошлый год)</div>
+                        <div class="text-lg font-bold text-gray-800">{{ giss_data.gross_production_previous_year|floatformat:0|intcomma }} тг</div>
+                    </div>
+                    <div class="p-4 rounded-xl bg-gray-50 border border-gray-200 text-center">
+                        <div class="text-xs text-gray-500 mb-1">Валовая продукция (позапрошлый год)</div>
+                        <div class="text-lg font-bold text-gray-800">{{ giss_data.gross_production_year_before|floatformat:0|intcomma }} тг</div>
+                    </div>
+                </div>
+
+                {% if giss_data.consecutive_decline_years and giss_data.consecutive_decline_years > 0 %}
+                <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
+                    <i class="fas fa-triangle-exclamation text-red-500 text-lg"></i>
+                    <div>
+                        <div class="text-sm font-bold text-red-800">Последовательное снижение: {{ giss_data.consecutive_decline_years }} год(а)</div>
+                        <div class="text-xs text-red-600">Наблюдается устойчивое снижение валовой продукции</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ==================== TAB: ESF (INVOICES) ==================== -->
+        <div x-show="tab === 'esf'" x-cloak class="slide-up mt-4 space-y-4">
+            <div class="card-glass p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider"><i class="fas fa-file-invoice mr-1"></i> Электронные счёт-фактуры (ЭСФ)</h3>
+                    <div class="flex items-center gap-3">
+                        <span class="badge-info text-xs px-2 py-0.5 rounded-md">{{ esf_summary.invoice_count|default:0 }} счетов</span>
+                        <span class="badge-lime text-xs px-2 py-0.5 rounded-md font-mono">{{ esf_summary.total_amount|floatformat:0|intcomma|default:0 }} тг</span>
+                    </div>
+                </div>
+
+                {% if invoices %}
+                <div x-data="{ expandedRow: null }" class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 border-b-2 border-gray-100 uppercase tracking-wider">
+                                <th class="pb-3 pr-2">#</th>
+                                <th class="pb-3 pr-2">Номер ЭСФ</th>
+                                <th class="pb-3 pr-2">Дата</th>
+                                <th class="pb-3 pr-2">Продавец</th>
+                                <th class="pb-3 pr-2 text-right">Сумма</th>
+                                <th class="pb-3 text-center">Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inv in invoices %}
+                            <tr class="esf-row border-b border-gray-100 cursor-pointer" @click="expandedRow = expandedRow === {{ forloop.counter }} ? null : {{ forloop.counter }}">
+                                <td class="py-3 pr-2 text-gray-400">{{ forloop.counter }}</td>
+                                <td class="py-3 pr-2 font-mono text-xs font-medium text-gray-800">{{ inv.esf_number }}</td>
+                                <td class="py-3 pr-2 text-gray-600">{{ inv.date }}</td>
+                                <td class="py-3 pr-2 text-gray-700">{{ inv.seller_name }}</td>
+                                <td class="py-3 pr-2 text-right font-mono font-medium">{{ inv.total_amount|floatformat:0|intcomma }} тг</td>
+                                <td class="py-3 text-center">
+                                    {% if inv.status == 'confirmed' or inv.payment_confirmed %}
+                                    <span class="badge-success text-[10px] px-2 py-0.5 rounded-md">Подтверждён</span>
+                                    {% else %}
+                                    <span class="badge-warning text-[10px] px-2 py-0.5 rounded-md">Ожидание</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr x-show="expandedRow === {{ forloop.counter }}" x-cloak>
+                                <td colspan="6" class="pb-3 pt-0 px-2">
+                                    <div class="bg-gray-50 rounded-lg p-3 text-xs">
+                                        <div class="font-bold text-gray-600 mb-2">Позиции:</div>
+                                        <table class="w-full">
+                                            <thead>
+                                                <tr class="text-left text-gray-500 border-b border-gray-200">
+                                                    <th class="pb-1">Наименование</th>
+                                                    <th class="pb-1 text-right">Кол-во</th>
+                                                    <th class="pb-1 text-right">Ед.</th>
+                                                    <th class="pb-1 text-right">Цена</th>
+                                                    <th class="pb-1 text-right">Сумма</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in inv.items %}
+                                                <tr class="border-b border-gray-100">
+                                                    <td class="py-1 text-gray-700">{{ item.description }}</td>
+                                                    <td class="py-1 text-right font-mono">{{ item.quantity }}</td>
+                                                    <td class="py-1 text-right text-gray-500">{{ item.unit }}</td>
+                                                    <td class="py-1 text-right font-mono">{{ item.unit_price|floatformat:0|intcomma }}</td>
+                                                    <td class="py-1 text-right font-mono font-medium">{{ item.amount|floatformat:0|intcomma }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-gray-400 text-sm text-center py-4"><i class="fas fa-inbox text-xl mb-1 block"></i>Нет счёт-фактур</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ==================== TAB: FINANCE ==================== -->
+        <div x-show="tab === 'finance'" x-cloak class="slide-up mt-4 space-y-4">
+
+            <!-- EASU Section -->
+            <div class="card-glass p-6">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="fas fa-university mr-1"></i> ЕАСУ (Единая автоматизированная система учёта)</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="p-4 rounded-xl bg-gray-50 border border-gray-200">
+                        <div class="text-xs text-gray-500 mb-1">Банковский счёт</div>
+                        {% if easu_data.has_account_number %}
+                        <div class="flex items-center gap-2">
+                            <span class="badge-success text-xs px-2 py-0.5 rounded-md"><i class="fas fa-check mr-1"></i>Зарегистрирован</span>
+                        </div>
+                        {% if easu_data.account_numbers %}
+                        <div class="mt-2 space-y-1">
+                            {% for acc in easu_data.account_numbers %}
+                            <div class="font-mono text-sm text-gray-800">{{ acc }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% else %}
+                        <span class="badge-error text-xs px-2 py-0.5 rounded-md"><i class="fas fa-xmark mr-1"></i>Не зарегистрирован</span>
+                        {% endif %}
+                    </div>
+                    <div class="p-4 rounded-xl bg-gray-50 border border-gray-200">
+                        <div class="text-xs text-gray-500 mb-1">Статус СПК</div>
+                        {% if easu_data.is_spk %}
+                        <div class="flex items-center gap-2">
+                            <span class="badge-success text-xs px-2 py-0.5 rounded-md"><i class="fas fa-check mr-1"></i>Член СПК</span>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-800">
+                            <div class="text-xs text-gray-500">Название СПК</div>
+                            <div class="font-medium">{{ easu_data.spk_name }}</div>
+                        </div>
+                        {% if easu_data.spk_members %}
+                        <div class="text-xs text-gray-500 mt-2">Участников: {{ easu_data.spk_members }}</div>
+                        {% endif %}
+                        {% else %}
+                        <span class="badge-warning text-xs px-2 py-0.5 rounded-md">Не является членом СПК</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Treasury payments -->
+            <div class="card-glass p-6">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="fas fa-money-bill-transfer mr-1"></i> Казначейские платежи</h3>
+                {% if payments %}
+                <div class="space-y-3">
+                    {% for payment in payments %}
+                    <div class="p-4 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center justify-between gap-3 flex-wrap">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center
+                                    {% if payment.status == 'completed' or payment.status == 'paid' %}bg-green-100 text-green-600
+                                    {% elif payment.status == 'processing' or payment.status == 'pending' %}bg-yellow-100 text-yellow-600
+                                    {% elif payment.status == 'failed' or payment.status == 'rejected' %}bg-red-100 text-red-600
+                                    {% else %}bg-gray-100 text-gray-500{% endif %}">
+                                    {% if payment.status == 'completed' or payment.status == 'paid' %}<i class="fas fa-check"></i>
+                                    {% elif payment.status == 'processing' or payment.status == 'pending' %}<i class="fas fa-clock"></i>
+                                    {% elif payment.status == 'failed' or payment.status == 'rejected' %}<i class="fas fa-xmark"></i>
+                                    {% else %}<i class="fas fa-money-bill"></i>{% endif %}
+                                </div>
+                                <div>
+                                    <div class="text-sm font-medium text-gray-800">Платёж {{ payment.payment_id }}</div>
+                                    <div class="text-xs text-gray-500">
+                                        Реф: <span class="font-mono">{{ payment.treasury_reference }}</span>
+                                        {% if payment.paid_date %} · {{ payment.paid_date }}{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="font-mono font-bold text-gray-800">{{ payment.amount|floatformat:0|intcomma }} тг</span>
+                                {% if payment.status == 'completed' or payment.status == 'paid' %}
+                                <span class="badge-success text-xs px-2 py-0.5 rounded-md">Выплачен</span>
+                                {% elif payment.status == 'processing' or payment.status == 'pending' %}
+                                <span class="badge-warning text-xs px-2 py-0.5 rounded-md">В обработке</span>
+                                {% elif payment.status == 'failed' or payment.status == 'rejected' %}
+                                <span class="badge-error text-xs px-2 py-0.5 rounded-md">Ошибка</span>
+                                {% else %}
+                                <span class="badge-info text-xs px-2 py-0.5 rounded-md">{{ payment.status }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-400 text-sm text-center py-4"><i class="fas fa-inbox text-xl mb-1 block"></i>Нет платежей из казначейства</p>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ======== MY APPLICATIONS ======== -->
+    {% if my_applications %}
+    <div class="card-glass p-6">
+        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="fas fa-file-lines mr-1"></i> Мои заявки</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-gray-500 border-b-2 border-gray-100 uppercase tracking-wider">
+                        <th class="pb-3 pr-2">Номер</th>
+                        <th class="pb-3 pr-2">Вид субсидии</th>
+                        <th class="pb-3 pr-2 text-right">Сумма</th>
+                        <th class="pb-3 pr-2 text-center">Статус</th>
+                        <th class="pb-3">Дата подачи</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for app in my_applications %}
+                    <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td class="py-3 pr-2">
+                            <a href="/applications/{{ app.id }}/" class="font-mono text-xs font-medium text-gray-800 hover:text-lime-600 transition-colors">{{ app.number }}</a>
+                        </td>
+                        <td class="py-3 pr-2 text-gray-700">{{ app.subsidy_type }}</td>
+                        <td class="py-3 pr-2 text-right font-mono font-medium">{{ app.total_amount|floatformat:0|intcomma }} тг</td>
+                        <td class="py-3 pr-2 text-center">
+                            {% if app.status == 'draft' %}<span class="badge-info text-xs px-2 py-0.5 rounded-md">Черновик</span>
+                            {% elif app.status == 'submitted' %}<span class="badge-lime text-xs px-2 py-0.5 rounded-md">Подана</span>
+                            {% elif app.status == 'checking' %}<span class="badge-warning text-xs px-2 py-0.5 rounded-md">На проверке</span>
+                            {% elif app.status == 'approved' %}<span class="badge-success text-xs px-2 py-0.5 rounded-md">Одобрена</span>
+                            {% elif app.status == 'rejected' %}<span class="badge-error text-xs px-2 py-0.5 rounded-md">Отказ</span>
+                            {% elif app.status == 'waiting_list' %}<span class="badge-warning text-xs px-2 py-0.5 rounded-md">Лист ожидания</span>
+                            {% elif app.status == 'partially_paid' %}<span class="badge-info text-xs px-2 py-0.5 rounded-md">Частично</span>
+                            {% elif app.status == 'paid' %}<span class="badge-success text-xs px-2 py-0.5 rounded-md font-bold">Выплачена</span>
+                            {% else %}<span class="badge-info text-xs px-2 py-0.5 rounded-md">{{ app.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 text-gray-500 text-xs">{{ app.submitted_at|date:"d.m.Y H:i"|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endif %}
+{% endblock %}
