@@ -1006,12 +1006,12 @@
                         <input type="number" x-model.number="unitPrice" min="0" step="10000" placeholder="Например: 450000" class="w-full sm:w-1/2">
                         <!-- Fixed 50% check: only show when unitPrice is actually filled and makes sense -->
                         <template x-if="unitPrice > 0 && selectedRate > unitPrice * 0.5">
-                            <div class="mt-2 p-3 rounded-xl bg-orange-50 border border-orange-200">
-                                <p class="text-xs text-orange-700">
-                                    <i class="fas fa-exclamation-triangle mr-1"></i>
-                                    <strong>Внимание:</strong> Ставка субсидии (<span x-text="Number(selectedRate).toLocaleString('ru-RU')"></span> ₸) превышает 50% от указанной стоимости (<span x-text="Number(unitPrice * 0.5).toLocaleString('ru-RU')"></span> ₸).
+                            <div class="mt-2 p-3 rounded-xl bg-red-50 border border-red-200">
+                                <p class="text-xs text-red-700">
+                                    <i class="fas fa-times-circle mr-1"></i>
+                                    <strong>Подача невозможна:</strong> Ставка субсидии (<span x-text="Number(selectedRate).toLocaleString('ru-RU')"></span> ₸) превышает 50% от указанной стоимости (<span x-text="Number(unitPrice * 0.5).toLocaleString('ru-RU')"></span> ₸).
                                 </p>
-                                <p class="text-xs text-orange-600 mt-1">По Приказу №108, субсидия не может быть больше половины фактической цены. Сумма будет скорректирована автоматически при рассмотрении.</p>
+                                <p class="text-xs text-red-600 mt-1">По Приказу №108, субсидия не может быть больше половины фактической цены. Укажите корректную стоимость покупки.</p>
                             </div>
                         </template>
                     </div>
@@ -1062,7 +1062,7 @@
                     <div class="flex justify-between mt-5">
                         <button type="button" class="draft-btn" @click="goToStep(isAnimalDirection() ? 5 : 4)"><i class="fas fa-arrow-left"></i> Назад</button>
                         <button type="button" class="btn-lime"
-                                :disabled="quantity < 1"
+                                :disabled="quantity < 1 || (unitPrice > 0 && selectedRate > unitPrice * 0.5)"
                                 @click="goToStep(7)">
                             Далее: Документы <i class="fas fa-arrow-right ml-1"></i>
                         </button>

@@ -19,6 +19,188 @@ from .models import (
 )
 
 
+def _fmt_tg(val):
+    """Форматирует сумму в тенге."""
+    if val is None:
+        return '—'
+    val = float(val)
+    if val >= 1_000_000:
+        return f'{val / 1_000_000:.1f} млн ₸'
+    if val >= 1_000:
+        return f'{val / 1_000:.0f} тыс ₸'
+    return f'{val:,.0f} ₸'
+
+
+def _factor_formula(factor_code, raw_data, value, max_value):
+    """Генерирует человекопонятное объяснение формулы расчёта для каждого фактора."""
+    lines = []
+
+    if factor_code == 'subsidy_history':
+        total = raw_data.get('total_subsidies', 0)
+        successful = raw_data.get('successful', 0)
+        rate = raw_data.get('success_rate', 0)
+        penalty = raw_data.get('counter_obligations_penalty', 0)
+        received = raw_data.get('total_subsidies_received_tenge', 0)
+        db_used = raw_data.get('db_history_used', False)
+
+        lines.append({'label': 'Всего субсидий', 'value': str(total), 'source': 'ИАС РСЖ + БД' if db_used else 'ИАС РСЖ'})
+        lines.append({'label': 'Успешных', 'value': str(successful)})
+        lines.append({'label': 'Доля успеха', 'value': f'{rate:.0%}'})
+        if total == 0:
+            lines.append({'label': 'Формула', 'value': 'Первичный заявитель → 10 баллов (нейтральный)', 'is_formula': True})
+        elif rate >= 0.9:
+            lines.append({'label': 'Формула', 'value': f'Успех ≥ 90% → 18 + min({total}, 2) = {value}', 'is_formula': True})
+        elif rate >= 0.7:
+            lines.append({'label': 'Формула', 'value': f'Успех 70-90% → 14 + ({rate:.2f} - 0.7) × 20 = {value}', 'is_formula': True})
+        elif rate >= 0.5:
+            lines.append({'label': 'Формула', 'value': f'Успех 50-70% → 8 + ({rate:.2f} - 0.5) × 30 = {value}', 'is_formula': True})
+        else:
+            lines.append({'label': 'Формула', 'value': f'Успех < 50% → {rate:.2f} × 16 = {value}', 'is_formula': True})
+        if penalty > 0:
+            lines.append({'label': 'Штраф (Приказ №108)', 'value': f'-{penalty:.0f} баллов (получено {_fmt_tg(received)} субсидий, падение продукции)', 'is_penalty': True})
+
+    elif factor_code == 'production_growth':
+        growth = raw_data.get('growth_rate', 0)
+        prev = raw_data.get('gross_production_previous_year', 0)
+        before = raw_data.get('gross_production_year_before', 0)
+
+        lines.append({'label': 'Продукция прошлый год', 'value': _fmt_tg(prev), 'source': 'ГИСС'})
+        lines.append({'label': 'Продукция позапрошлый год', 'value': _fmt_tg(before), 'source': 'ГИСС'})
+        lines.append({'label': 'Темп роста', 'value': f'{growth:+.1f}%'})
+        if growth >= 10:
+            lines.append({'label': 'Формула', 'value': f'Рост ≥ 10% → максимум 20 баллов', 'is_formula': True})
+        elif growth >= 5:
+            lines.append({'label': 'Формула', 'value': f'Рост 5-10% → 14 + ({growth:.1f} - 5) × 1.2 = {value}', 'is_formula': True})
+        elif growth >= 0:
+            lines.append({'label': 'Формула', 'value': f'Рост 0-5% → 8 + {growth:.1f} × 1.2 = {value}', 'is_formula': True})
+        elif growth >= -5:
+            lines.append({'label': 'Формула', 'value': f'Снижение 0-5% → 4 + ({growth:.1f} + 5) × 0.8 = {value}', 'is_formula': True})
+        else:
+            lines.append({'label': 'Формула', 'value': f'Снижение > 5% → max(0, 4 + {growth:.1f} × 0.4) = {value}', 'is_formula': True})
+
+    elif factor_code == 'farm_size':
+        land = raw_data.get('land_area', 0)
+        herd = raw_data.get('herd_size', 0)
+        land_s = raw_data.get('land_score', 0)
+        herd_s = raw_data.get('herd_score', 0)
+
+        lines.append({'label': 'Площадь с/х земли', 'value': f'{land:.1f} га', 'source': 'ЕГКН'})
+        lines.append({'label': 'Верифицированное поголовье', 'value': f'{herd} голов', 'source': 'ИС ИСЖ'})
+        lines.append({'label': 'Балл за землю', 'value': f'{land_s:.1f} из 8'})
+        lines.append({'label': 'Балл за поголовье', 'value': f'{herd_s:.1f} из 7'})
+        lines.append({'label': 'Формула', 'value': f'{land_s:.1f} (земля) + {herd_s:.1f} (поголовье) = {value}', 'is_formula': True})
+
+    elif factor_code == 'efficiency':
+        total_heads = raw_data.get('total_heads_subsidized', 0)
+        returns = raw_data.get('pending_returns', 0)
+        retention = raw_data.get('retention_rate')
+        co_bonus = raw_data.get('counter_obligations_bonus', 0)
+        co_penalty = raw_data.get('counter_obligations_penalty', 0)
+        co_required = raw_data.get('counter_obligations_required', False)
+
+        lines.append({'label': 'Субсидированных голов', 'value': str(total_heads), 'source': 'ИАС РСЖ'})
+        lines.append({'label': 'Возвратов/потерь', 'value': str(returns)})
+        if retention is not None:
+            lines.append({'label': 'Сохранность', 'value': f'{retention:.0%}'})
+        if co_required:
+            lines.append({'label': 'Встречные обязательства', 'value': 'Требуются (субсидий > 100 млн ₸)', 'source': 'ГИСС'})
+        if co_bonus > 0:
+            lines.append({'label': 'Бонус за рост продукции', 'value': f'+{co_bonus:.0f} баллов', 'is_bonus': True})
+        if co_penalty > 0:
+            lines.append({'label': 'Штраф за снижение', 'value': f'-{co_penalty:.0f} баллов', 'is_penalty': True})
+        lines.append({'label': 'Формула', 'value': f'Базовый балл сохранности ± обязательства = {value}', 'is_formula': True})
+
+    elif factor_code == 'rate_compliance':
+        esf_total = raw_data.get('esf_total', 0)
+        requested = raw_data.get('requested', 0)
+        expected = raw_data.get('expected', 0)
+        rate_match = raw_data.get('rate_match', False)
+        esf_covers = raw_data.get('esf_covers', False)
+
+        lines.append({'label': 'Запрошено', 'value': _fmt_tg(requested)})
+        lines.append({'label': 'По нормативу', 'value': _fmt_tg(expected)})
+        lines.append({'label': 'Сумма ЭСФ', 'value': _fmt_tg(esf_total), 'source': 'ИС ЭСФ'})
+        lines.append({'label': 'Совпадает с нормативом?', 'value': 'Да' if rate_match else 'Нет'})
+        lines.append({'label': 'ЭСФ покрывает стоимость?', 'value': 'Да' if esf_covers else 'Нет'})
+        if rate_match and esf_covers:
+            lines.append({'label': 'Формула', 'value': 'Норматив совпал + ЭСФ покрывает → 10 баллов (максимум)', 'is_formula': True})
+        elif rate_match:
+            lines.append({'label': 'Формула', 'value': 'Норматив совпал, но ЭСФ не покрывает → 6 баллов', 'is_formula': True})
+        elif esf_covers:
+            lines.append({'label': 'Формула', 'value': 'Норматив не совпал, но ЭСФ покрывает → 4 балла', 'is_formula': True})
+        else:
+            lines.append({'label': 'Формула', 'value': 'Ни норматив, ни ЭСФ не совпали → 2 балла', 'is_formula': True})
+
+    elif factor_code == 'region_priority':
+        region = raw_data.get('region', '')
+        direction = raw_data.get('direction_code', '')
+        priority = raw_data.get('priority', 0.5)
+
+        lines.append({'label': 'Регион', 'value': region})
+        lines.append({'label': 'Направление', 'value': direction})
+        lines.append({'label': 'Приоритет региона', 'value': f'{priority:.1f} из 1.0', 'source': 'Справочник МСХ'})
+        lines.append({'label': 'Формула', 'value': f'{priority:.1f} × 10 = {value}', 'is_formula': True})
+
+    elif factor_code == 'entity_type':
+        etype = raw_data.get('entity_type', '')
+        labels = {'cooperative': 'СПК (5 баллов)', 'legal': 'Юрлицо (4 балла)', 'individual': 'Физлицо (3 балла)'}
+        lines.append({'label': 'Тип заявителя', 'value': labels.get(etype, etype), 'source': 'ЕАСУ'})
+        lines.append({'label': 'Формула', 'value': f'СПК=5, Юрлицо=4, Физлицо=3 → {value}', 'is_formula': True})
+
+    elif factor_code == 'applicant_history':
+        total = raw_data.get('total_subsidies', 0)
+        same_dir = raw_data.get('has_same_direction', False)
+        db_total = raw_data.get('db_total_apps', 0)
+        db_avg = raw_data.get('db_avg_score')
+
+        lines.append({'label': 'Всего заявок', 'value': str(total), 'source': 'ИАС РСЖ + БД'})
+        if db_avg:
+            lines.append({'label': 'Средний балл прошлых заявок', 'value': f'{db_avg:.1f}', 'source': 'БД'})
+        if total == 0:
+            lines.append({'label': 'Формула', 'value': 'Первичный заявитель → 4 балла (приоритет новых)', 'is_formula': True})
+        elif not same_dir and db_total == 0:
+            lines.append({'label': 'Формула', 'value': 'Диверсификация (новое направление) → 5 баллов', 'is_formula': True})
+        elif total <= 3:
+            lines.append({'label': 'Формула', 'value': f'Умеренный повторный заявитель ({total} заявок) → 3 балла', 'is_formula': True})
+        else:
+            lines.append({'label': 'Формула', 'value': f'Частый заявитель ({total} заявок) → 2 балла', 'is_formula': True})
+
+    return lines
+
+
+def _shap_value_explain(feature, feature_value):
+    """Человекопонятное объяснение SHAP значения признака."""
+    explanations = {
+        'giss_registered': lambda v: 'Зарегистрирован в ГИСС' if v else 'Не зарегистрирован в ГИСС',
+        'growth_rate': lambda v: f'Темп роста продукции: {v:+.1f}%',
+        'gross_production_prev': lambda v: f'Валовая продукция: {v:.1f} млн ₸',
+        'gross_production_before': lambda v: f'Валовая продукция (год ранее): {v:.1f} млн ₸',
+        'obligations_met': lambda v: 'Обязательства выполнены' if v else 'Обязательства не выполнены',
+        'total_subsidies_received': lambda v: f'Получено субсидий: {v:.1f} млн ₸',
+        'ias_registered': lambda v: 'Зарегистрирован в ИАС РСЖ' if v else 'Не зарегистрирован',
+        'subsidy_history_count': lambda v: f'{int(v)} субсидий в истории',
+        'subsidy_success_rate': lambda v: f'Доля успешных субсидий: {v:.0%}',
+        'pending_returns': lambda v: f'{int(v)} невозвращённых субсидий',
+        'total_verified_animals': lambda v: f'{int(v)} верифицированных животных',
+        'total_rejected_animals': lambda v: f'{int(v)} отклонённых животных',
+        'animal_age_valid_ratio': lambda v: f'Доля с допустимым возрастом: {v:.0%}',
+        'esf_total_amount': lambda v: f'Сумма ЭСФ: {v:.1f} млн ₸',
+        'esf_invoice_count': lambda v: f'{int(v)} счетов-фактур',
+        'esf_confirmed_ratio': lambda v: f'Подтверждённых ЭСФ: {v:.0%}',
+        'has_agricultural_land': lambda v: 'Есть с/х земля' if v else 'Нет с/х земли',
+        'total_agricultural_area': lambda v: f'Площадь с/х земли: {v:.1f} га',
+        'entity_type_encoded': lambda v: {0: 'Физлицо', 1: 'Юрлицо', 2: 'СПК (кооператив)'}.get(int(v), f'Тип {int(v)}'),
+        'treasury_payment_count': lambda v: f'{int(v)} платежей через Казначейство',
+    }
+    fn = explanations.get(feature)
+    if fn:
+        try:
+            return fn(feature_value)
+        except (ValueError, TypeError):
+            pass
+    return f'{feature_value}'
+
+
 def _get_role(user):
     """Получить роль пользователя."""
     try:
@@ -244,6 +426,10 @@ def application_create(request):
         esf_number = request.POST.get('esf_number', '')
         phone = request.POST.get('phone', '')
         bank_account = request.POST.get('bank_account', '')
+        try:
+            user_unit_price = float(request.POST.get('unit_price', 0) or 0)
+        except (ValueError, TypeError):
+            user_unit_price = 0
         ecp_signed = request.POST.get('ecp_signed') == 'true'
 
         # JSON-данные выбранных элементов
@@ -272,6 +458,36 @@ def application_create(request):
         except SubsidyType.DoesNotExist:
             messages.error(request, 'Вид субсидии не найден')
             return redirect('/applications/new/')
+
+        # Серверная пре-валидация: проверяем базовые условия до создания заявки
+        from apps.emulator.models import EmulatedEntity
+        pre_entity = EmulatedEntity.objects.filter(iin_bin=iin_bin).first()
+        if pre_entity:
+            pre_giss = pre_entity.giss_data or {}
+            pre_easu = pre_entity.easu_data or {}
+            pre_ias = pre_entity.ias_rszh_data or {}
+            pre_errors = []
+            if not pre_giss.get('registered', False):
+                pre_errors.append('Нет регистрации в ГИСС')
+            if pre_giss.get('blocked', False):
+                pre_errors.append('Аккаунт заблокирован в ГИСС')
+            if not pre_easu.get('has_account_number', False):
+                pre_errors.append('Нет ЭЦП (ЕАСУ)')
+            if not pre_ias.get('registered', False) and entity_type != 'cooperative':
+                pre_errors.append('Нет регистрации в ИАС РСЖ')
+            # Проверяем выбранных животных на ранее субсидированных
+            for a in selected_animals:
+                if a.get('previously_subsidized', False):
+                    pre_errors.append(f'Животное {a.get("tag", a.get("tag_number", ""))} ранее субсидировалось')
+            # Проверка 50% стоимости
+            if user_unit_price > 0 and float(stype.rate) > user_unit_price * 0.5:
+                pre_errors.append(
+                    f'Ставка субсидии ({stype.rate} ₸) превышает 50% от стоимости покупки ({user_unit_price * 0.5:.0f} ₸)'
+                )
+            if pre_errors:
+                for err in pre_errors:
+                    messages.error(request, err)
+                return redirect('/applications/new/')
 
         applicant, created = Applicant.objects.get_or_create(
             iin_bin=iin_bin,
@@ -312,7 +528,7 @@ def application_create(request):
             subsidy_type=stype,
             status='submitted',
             quantity=quantity,
-            unit_price=float(stype.rate),
+            unit_price=user_unit_price if user_unit_price > 0 else float(stype.rate),
             rate=stype.rate,
             total_amount=quantity * stype.rate,
             submitted_at=timezone.now(),
@@ -689,15 +905,60 @@ def application_detail(request, pk):
         for item in shap_items:
             item['bar_pct'] = round(abs(item['shap_value']) / max_abs * 100, 1)
             item['direction'] = 'positive' if item['shap_value'] >= 0 else 'negative'
+            # Человекопонятное описание значения признака
+            item['value_explanation'] = _shap_value_explain(
+                item.get('feature', ''), item.get('feature_value', 0)
+            )
         shap_data = {
             'items': shap_items,
             'base_value': score.explanation.get('base_value', 0),
         }
 
+    # Enriched factors with raw_data for detailed display
+    factors_enriched = []
+    for f in factors:
+        fe = {
+            'factor_name': f.factor_name,
+            'factor_code': f.factor_code,
+            'value': f.value,
+            'max_value': f.max_value,
+            'weight': f.weight,
+            'weighted_value': f.weighted_value,
+            'explanation': f.explanation,
+            'data_source': f.data_source,
+            'raw_data': f.raw_data or {},
+            'formula': _factor_formula(f.factor_code, f.raw_data or {}, f.value, f.max_value),
+        }
+        factors_enriched.append(fe)
+
+    # ML vs Rules breakdown
+    scoring_breakdown = None
+    if score and score.recommendation_reason:
+        reason = score.recommendation_reason
+        rule_score = None
+        ml_score = None
+        ml_confidence = None
+        # Parse from recommendation_reason: "[AI модель: XX.X баллов, уверенность XX%; Правила: XX.X; Итого: XX.X/100]"
+        import re
+        m = re.search(r'AI модель:\s*([\d.]+)\s*баллов.*?уверенность\s*([\d.]+)%.*?Правила:\s*([\d.]+)', reason)
+        if m:
+            ml_score = float(m.group(1))
+            ml_confidence = float(m.group(2))
+            rule_score = float(m.group(3))
+        scoring_breakdown = {
+            'ml_score': ml_score,
+            'ml_confidence': ml_confidence,
+            'rule_score': rule_score,
+            'total_score': float(score.total_score),
+            'has_ml': ml_score is not None,
+            'ml_weight': 60,
+            'rule_weight': 40,
+        }
+
     return render(request, 'scoring/application_detail.html', {
         'app': app,
         'score': score,
-        'factors': factors,
+        'factors': factors_enriched,
         'hard_filters': hard_filters,
         'filter_items': filter_items,
         'documents': documents,
@@ -710,6 +971,7 @@ def application_detail(request, pk):
         'applicant_history': applicant_history,
         'history_summary': history_summary,
         'shap_data': shap_data,
+        'scoring_breakdown': scoring_breakdown,
         'user_role': role,
     })
 
@@ -1700,13 +1962,18 @@ def application_save_draft(request):
         if not Application.objects.filter(number=number).exists():
             break
 
+    try:
+        draft_unit_price = float(data.get('unit_price', 0) or 0)
+    except (ValueError, TypeError):
+        draft_unit_price = 0
+
     app = Application.objects.create(
         number=number,
         applicant=applicant,
         subsidy_type=stype,
         status='draft',
         quantity=quantity,
-        unit_price=float(stype.rate),
+        unit_price=draft_unit_price if draft_unit_price > 0 else float(stype.rate),
         rate=stype.rate,
         total_amount=quantity * stype.rate,
         submitted_at=None,

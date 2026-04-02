@@ -148,6 +148,17 @@ class HardFilterChecker:
                 applicant_blocked = False
         return not giss_blocked and not applicant_blocked
 
+    def _get_selected_animals(self):
+        """Возвращает выбранные животные из заявки, или все из ИС ИСЖ если не указаны."""
+        selected = self.application.animals_data or []
+        if selected:
+            return selected
+        # Fallback: все животные из EmulatedEntity
+        if not self.entity:
+            return []
+        is_iszh = self.entity.is_iszh_data or {}
+        return is_iszh.get('animals', [])
+
     def _check_animals_age_valid(self):
         """Фильтр 10: Возраст животных в допустимом диапазоне (ИС ИСЖ)."""
         # Если SubsidyType не требует проверки возраста — пропускаем
@@ -156,25 +167,25 @@ class HardFilterChecker:
             return True
         if not self.entity:
             return False
-        is_iszh = self.entity.is_iszh_data or {}
-        animals = is_iszh.get('animals', [])
+        animals = self._get_selected_animals()
         if not animals:
             return False
-        # Все животные должны иметь age_valid == True
+        # Все выбранные животные должны иметь age_valid == True
         return all(animal.get('age_valid', False) for animal in animals)
 
     def _check_animals_not_subsidized(self):
-        """Фильтр 11: Животные не субсидировались ранее (ИС ИСЖ)."""
+        """Фильтр 11: Животные не субсидировались ранее (ИС ИСЖ).
+
+        Проверяет только выбранные животные из заявки (animals_data),
+        а не всех животных из EmulatedEntity.
+        """
         # Если субсидия не связана с животными — пропускаем
         subsidy_type = self.application.subsidy_type
         direction_code = subsidy_type.direction.code if subsidy_type.direction else ''
         animal_directions = {'cattle_meat', 'cattle_dairy', 'cattle_general', 'sheep', 'horse', 'pig', 'poultry', 'camel', 'beekeeping', 'aquaculture'}
         if direction_code not in animal_directions:
             return True
-        if not self.entity:
-            return False
-        is_iszh = self.entity.is_iszh_data or {}
-        animals = is_iszh.get('animals', [])
+        animals = self._get_selected_animals()
         if not animals:
             return True
         return all(
