@@ -1,0 +1,961 @@
+{
+  "_meta": {
+    "description": "Синтетический датасет SubsidyAI — эмуляция 7 государственных информационных систем МСХ РК",
+    "version": "2.0",
+    "generated_by": "apps/emulator/management/commands/generate_data.py",
+    "total_entities": 10,
+    "risk_distribution": {
+      "clean": "70%",
+      "minor_issues": "15%",
+      "risky": "10%",
+      "fraudulent": "5%"
+    },
+    "regulatory_basis": "Приказ №108 МСХ РК (ред. ноябрь 2025)",
+    "note": "Все данные вымышлены. ИИН/БИН, имена, суммы сгенерированы случайно для демонстрации работы AI-скоринга."
+  },
+
+  "entities": [
+    {
+      "iin_bin": "150832946271",
+      "name": "СПК \"Береке\"",
+      "entity_type": "cooperative",
+      "region": "Костанайская область",
+      "district": "Костанайский район",
+      "registration_date": "2018-03-15",
+      "risk_profile": "clean",
+      "giss_data": {
+        "registered": true,
+        "gross_production_previous_year": 145000000,
+        "gross_production_year_before": 128000000,
+        "growth_rate": 13.28,
+        "obligations_met": true,
+        "total_subsidies_received": 52000000,
+        "obligations_required": false,
+        "consecutive_decline_years": 0,
+        "repeat_violation": false,
+        "blocked": false,
+        "block_reason": null
+      },
+      "ias_rszh_data": {
+        "registered": true,
+        "registration_date": "2018-03-15",
+        "entity_type": "cooperative",
+        "name": "СПК \"Береке\"",
+        "region": "Костанайская область",
+        "district": "Костанайский район",
+        "subsidy_history": [
+          {
+            "year": 2024,
+            "type": "Приобретение маточного поголовья КРС",
+            "amount": 4500000,
+            "heads": 30,
+            "status": "executed",
+            "obligations_met": true
+          },
+          {
+            "year": 2023,
+            "type": "Ведение селекционной и племенной работы с маточным поголовьем КРС мясного",
+            "amount": 1500000,
+            "heads": 100,
+            "status": "executed",
+            "obligations_met": true
+          }
+        ],
+        "total_subsidies_history": 6000000,
+        "pending_returns": 0
+      },
+      "easu_data": {
+        "has_account_number": true,
+        "account_numbers": ["KZ-AGR-482917"],
+        "is_spk": true,
+        "spk_members": [],
+        "spk_name": "СПК \"Береке\""
+      },
+      "is_iszh_data": {
+        "verified": true,
+        "animals": [
+          {
+            "tag_number": "KZ84729183",
+            "type": "cattle",
+            "breed": "Казахская белоголовая",
+            "category": "heifer",
+            "sex": "female",
+            "birth_date": "2023-06-15",
+            "age_months": 14,
+            "age_valid": true,
+            "owner_iin_bin": "150832946271",
+            "owner_match": true,
+            "previously_subsidized": false,
+            "vet_status": "healthy",
+            "last_vet_check": "2026-03-01",
+            "registration_date": "2023-08-10",
+            "rfid_tag": "RFID-4829174",
+            "rfid_active": true,
+            "rfid_last_scan": "2026-03-30",
+            "rfid_scan_count_30d": 42
+          },
+          {
+            "tag_number": "KZ84729184",
+            "type": "cattle",
+            "breed": "Ангусская",
+            "category": "heifer",
+            "sex": "female",
+            "birth_date": "2023-03-20",
+            "age_months": 17,
+            "age_valid": true,
+            "owner_iin_bin": "150832946271",
+            "owner_match": true,
+            "previously_subsidized": false,
+            "vet_status": "healthy",
+            "last_vet_check": "2026-02-28",
+            "registration_date": "2023-05-15",
+            "rfid_tag": "RFID-4829175",
+            "rfid_active": true,
+            "rfid_last_scan": "2026-03-29",
+            "rfid_scan_count_30d": 38
+          },
+          {
+            "tag_number": "KZ84729185",
+            "type": "cattle",
+            "breed": "Герефордская",
+            "category": "bull",
+            "sex": "male",
+            "birth_date": "2022-09-10",
+            "age_months": 22,
+            "age_valid": true,
+            "owner_iin_bin": "150832946271",
+            "owner_match": true,
+            "previously_subsidized": false,
+            "vet_status": "healthy",
+            "last_vet_check": "2026-03-05",
+            "registration_date": "2022-11-20",
+            "rfid_tag": "RFID-4829176",
+            "rfid_active": true,
+            "rfid_last_scan": "2026-03-31",
+            "rfid_scan_count_30d": 55
+          },
+          {
+            "tag_number": "KZ84729186",
+            "type": "sheep",
+            "breed": "Эдильбаевская",
+            "category": "ewe",
+            "sex": "female",
+            "birth_date": "2024-01-10",
+            "age_months": 10,
+            "age_valid": true,
+            "owner_iin_bin": "150832946271",
+            "owner_match": true,
+            "previously_subsidized": false,
+            "vet_status": "healthy",
+            "last_vet_check": "2026-03-10",
+            "registration_date": "2024-03-01",
+            "rfid_tag": "RFID-4829177",
+            "rfid_active": true,
+            "rfid_last_scan": "2026-03-28",
+            "rfid_scan_count_30d": 31
+          },
+          {
+            "tag_number": "KZ84729187",
+            "type": "horse",
+            "breed": "Кустанайская",
+            "category": "heifer",
+            "sex": "female",
+            "birth_date": "2022-04-01",
+            "age_months": 24,
+            "age_valid": false,
+            "owner_iin_bin": "150832946271",
+            "owner_match": true,
+            "previously_subsidized": false,
+            "vet_status": "healthy",
+            "last_vet_check": "2026-02-15",
+            "registration_date": "2022-06-01",
+            "rfid_tag": null,
+            "rfid_active": false,
+            "rfid_last_scan": null,
+            "rfid_scan_count_30d": 0
+          }
+        ],
+        "total_verified": 4,
+        "total_rejected": 1,
+        "rejection_reasons": []
+      },
+      "is_esf_data": {
+        "invoices": [
+          {
+            "esf_number": "ESF-2025-8374921",
+            "date": "2025-09-15",
+            "seller_bin": "210643281749",
+            "seller_name": "ТОО \"Тулпар Костанай\"",
+            "buyer_iin_bin": "150832946271",
+            "total_amount": 6000000,
+            "items": [
+              {
+                "description": "Племенные тёлки ангусской породы",
+                "quantity": 15,
+                "unit": "голова",
+                "unit_price": 400000,
+                "amount": 6000000
+              }
+            ],
+            "status": "confirmed",
+            "payment_confirmed": true
+          }
+        ],
+        "total_amount": 6000000,
+        "invoice_count": 1
+      },
+      "egkn_data": {
+        "has_agricultural_land": true,
+        "plots": [
+          {
+            "cadastral_number": "45-291-847-102",
+            "area_hectares": 320.5,
+            "purpose": "сельскохозяйственное назначение",
+            "sub_purpose": "пастбище",
+            "region": "Костанайская область",
+            "district": "Костанайский район",
+            "ownership_type": "собственность",
+            "registration_date": "2017-05-20"
+          },
+          {
+            "cadastral_number": "45-291-847-103",
+            "area_hectares": 85.0,
+            "purpose": "сельскохозяйственное назначение",
+            "sub_purpose": "сенокос",
+            "region": "Костанайская область",
+            "district": "Костанайский район",
+            "ownership_type": "аренда",
+            "registration_date": "2019-08-10"
+          }
+        ],
+        "total_agricultural_area": 405.5
+      },
+      "treasury_data": {
+        "payments": [
+          {
+            "payment_id": "PAY-2025-48291",
+            "amount": 4500000,
+            "status": "completed",
+            "paid_date": "2025-04-15",
+            "treasury_reference": "TR-2025-38291"
+          },
+          {
+            "payment_id": "PAY-2025-51832",
+            "amount": 1500000,
+            "status": "completed",
+            "paid_date": "2025-06-20",
+            "treasury_reference": "TR-2025-41832"
+          }
+        ]
+      }
+    },
+
+    {
+      "iin_bin": "880712301234",
+      "name": "КХ \"Жумабаев Н.\"",
+      "entity_type": "legal",
+      "region": "Акмолинская область",
+      "district": "Целиноградский район",
+      "registration_date": "2019-07-22",
+      "risk_profile": "clean",
+      "giss_data": {
+        "registered": true,
+        "gross_production_previous_year": 78000000,
+        "gross_production_year_before": 72000000,
+        "growth_rate": 8.33,
+        "obligations_met": true,
+        "total_subsidies_received": 18000000,
+        "obligations_required": false,
+        "consecutive_decline_years": 0,
+        "repeat_violation": false,
+        "blocked": false,
+        "block_reason": null
+      },
+      "ias_rszh_data": {
+        "registered": true,
+        "registration_date": "2019-07-22",
+        "entity_type": "legal",
+        "name": "КХ \"Жумабаев Н.\"",
+        "region": "Акмолинская область",
+        "district": "Целиноградский район",
+        "subsidy_history": [
+          {
+            "year": 2024,
+            "type": "Удешевление производства молока",
+            "amount": 3200000,
+            "heads": 50,
+            "status": "executed",
+            "obligations_met": true
+          }
+        ],
+        "total_subsidies_history": 3200000,
+        "pending_returns": 0
+      },
+      "easu_data": {
+        "has_account_number": true,
+        "account_numbers": ["KZ-AGR-729183"],
+        "is_spk": false,
+        "spk_members": [],
+        "spk_name": null
+      },
+      "is_iszh_data": {
+        "verified": true,
+        "animals": [
+          {
+            "tag_number": "KZ91827364",
+            "type": "cattle",
+            "breed": "Голштинская",
+            "category": "heifer",
+            "sex": "female",
+            "birth_date": "2023-10-01",
+            "age_months": 12,
+            "age_valid": true,
+            "owner_iin_bin": "880712301234",
+            "owner_match": true,
+            "previously_subsidized": false,
+            "vet_status": "healthy",
+            "last_vet_check": "2026-03-15",
+            "registration_date": "2023-12-01",
+            "rfid_tag": "RFID-9182736",
+            "rfid_active": true,
+            "rfid_last_scan": "2026-03-30",
+            "rfid_scan_count_30d": 35
+          },
+          {
+            "tag_number": "KZ91827365",
+            "type": "cattle",
+            "breed": "Симментальская",
+            "category": "heifer",
+            "sex": "female",
+            "birth_date": "2024-02-15",
+            "age_months": 9,
+            "age_valid": true,
+            "owner_iin_bin": "880712301234",
+            "owner_match": true,
+            "previously_subsidized": false,
+            "vet_status": "healthy",
+            "last_vet_check": "2026-03-20",
+            "registration_date": "2024-04-20",
+            "rfid_tag": "RFID-9182737",
+            "rfid_active": true,
+            "rfid_last_scan": "2026-03-28",
+            "rfid_scan_count_30d": 28
+          }
+        ],
+        "total_verified": 2,
+        "total_rejected": 0,
+        "rejection_reasons": []
+      },
+      "is_esf_data": {
+        "invoices": [
+          {
+            "esf_number": "ESF-2025-1827364",
+            "date": "2025-11-10",
+            "seller_bin": "190572839174",
+            "seller_name": "ТОО \"Байтерек Астана\"",
+            "buyer_iin_bin": "880712301234",
+            "total_amount": 3400000,
+            "items": [
+              {
+                "description": "Племенные тёлки голштинской породы",
+                "quantity": 10,
+                "unit": "голова",
+                "unit_price": 340000,
+                "amount": 3400000
+              }
+            ],
+            "status": "confirmed",
+            "payment_confirmed": true
+          }
+        ],
+        "total_amount": 3400000,
+        "invoice_count": 1
+      },
+      "egkn_data": {
+        "has_agricultural_land": true,
+        "plots": [
+          {
+            "cadastral_number": "01-482-193-847",
+            "area_hectares": 150.0,
+            "purpose": "сельскохозяйственное назначение",
+            "sub_purpose": "пашня",
+            "region": "Акмолинская область",
+            "district": "Целиноградский район",
+            "ownership_type": "собственность",
+            "registration_date": "2019-09-15"
+          }
+        ],
+        "total_agricultural_area": 150.0
+      },
+      "treasury_data": {
+        "payments": [
+          {
+            "payment_id": "PAY-2025-71823",
+            "amount": 3200000,
+            "status": "completed",
+            "paid_date": "2025-03-10",
+            "treasury_reference": "TR-2025-61823"
+          }
+        ]
+      }
+    },
+
+    {
+      "iin_bin": "750401301234",
+      "name": "ТОО \"Агрофирма Омаров\"",
+      "entity_type": "legal",
+      "region": "Туркестанская область",
+      "district": "Сайрамский район",
+      "registration_date": "2015-11-05",
+      "risk_profile": "fraudulent",
+      "giss_data": {
+        "registered": true,
+        "gross_production_previous_year": 35000000,
+        "gross_production_year_before": 55000000,
+        "growth_rate": -36.36,
+        "obligations_met": false,
+        "total_subsidies_received": 180000000,
+        "obligations_required": true,
+        "consecutive_decline_years": 3,
+        "repeat_violation": true,
+        "blocked": true,
+        "block_reason": "Невыполнение встречных обязательств 2 года подряд"
+      },
+      "ias_rszh_data": {
+        "registered": true,
+        "registration_date": "2015-11-05",
+        "entity_type": "legal",
+        "name": "ТОО \"Агрофирма Омаров\"",
+        "region": "Туркестанская область",
+        "district": "Сайрамский район",
+        "subsidy_history": [
+          {
+            "year": 2024,
+            "type": "Приобретение маточного поголовья КРС",
+            "amount": 8000000,
+            "heads": 50,
+            "status": "pending",
+            "obligations_met": false
+          },
+          {
+            "year": 2023,
+            "type": "Приобретение маточного поголовья КРС",
+            "amount": 7500000,
+            "heads": 45,
+            "status": "pending",
+            "obligations_met": false
+          },
+          {
+            "year": 2022,
+            "type": "Удешевление стоимости бычков на откормплощадку",
+            "amount": 5000000,
+            "heads": 200,
+            "status": "executed",
+            "obligations_met": true
+          },
+          {
+            "year": 2021,
+            "type": "Приобретение племенных овец",
+            "amount": 2000000,
+            "heads": 80,
+            "status": "pending",
+            "obligations_met": false
+          }
+        ],
+        "total_subsidies_history": 22500000,
+        "pending_returns": 3
+      },
+      "easu_data": {
+        "has_account_number": true,
+        "account_numbers": ["KZ-AGR-382917"],
+        "is_spk": false,
+        "spk_members": [],
+        "spk_name": null
+      },
+      "is_iszh_data": {
+        "verified": true,
+        "animals": [
+          {
+            "tag_number": "KZ72819374",
+            "type": "cattle",
+            "breed": "Казахская белоголовая",
+            "category": "bull",
+            "sex": "male",
+            "birth_date": "2021-05-10",
+            "age_months": 35,
+            "age_valid": false,
+            "owner_iin_bin": "750401301234",
+            "owner_match": true,
+            "previously_subsidized": true,
+            "vet_status": "quarantine",
+            "last_vet_check": "2025-12-01",
+            "registration_date": "2021-07-15",
+            "rfid_tag": "RFID-7281937",
+            "rfid_active": false,
+            "rfid_last_scan": "2025-12-15",
+            "rfid_scan_count_30d": 0
+          },
+          {
+            "tag_number": "KZ72819375",
+            "type": "sheep",
+            "breed": "Гиссарская",
+            "category": "ewe",
+            "sex": "female",
+            "birth_date": "2024-06-01",
+            "age_months": 7,
+            "age_valid": true,
+            "owner_iin_bin": "750401301234",
+            "owner_match": true,
+            "previously_subsidized": true,
+            "vet_status": "healthy",
+            "last_vet_check": "2026-01-15",
+            "registration_date": "2024-08-10",
+            "rfid_tag": null,
+            "rfid_active": false,
+            "rfid_last_scan": null,
+            "rfid_scan_count_30d": 0
+          }
+        ],
+        "total_verified": 0,
+        "total_rejected": 2,
+        "rejection_reasons": []
+      },
+      "is_esf_data": {
+        "invoices": [
+          {
+            "esf_number": "ESF-2025-3829174",
+            "date": "2025-08-20",
+            "seller_bin": "170438291748",
+            "seller_name": "ТОО \"Дала Шымкент\"",
+            "buyer_iin_bin": "750401301234",
+            "total_amount": 2500000,
+            "items": [
+              {
+                "description": "Племенные овцы эдильбаевской породы",
+                "quantity": 50,
+                "unit": "голова",
+                "unit_price": 50000,
+                "amount": 2500000
+              }
+            ],
+            "status": "draft",
+            "payment_confirmed": false
+          }
+        ],
+        "total_amount": 2500000,
+        "invoice_count": 1
+      },
+      "egkn_data": {
+        "has_agricultural_land": true,
+        "plots": [
+          {
+            "cadastral_number": "61-193-482-019",
+            "area_hectares": 45.0,
+            "purpose": "сельскохозяйственное назначение",
+            "sub_purpose": "пастбище",
+            "region": "Туркестанская область",
+            "district": "Сайрамский район",
+            "ownership_type": "аренда",
+            "registration_date": "2016-03-10"
+          }
+        ],
+        "total_agricultural_area": 45.0
+      },
+      "treasury_data": {
+        "payments": []
+      }
+    },
+
+    {
+      "iin_bin": "920301512345",
+      "name": "ИП Алексеева С.В.",
+      "entity_type": "individual",
+      "region": "Алматинская область",
+      "district": "Талгарский район",
+      "registration_date": "2021-02-10",
+      "risk_profile": "minor_issues",
+      "giss_data": {
+        "registered": true,
+        "gross_production_previous_year": 22000000,
+        "gross_production_year_before": 24000000,
+        "growth_rate": -8.33,
+        "obligations_met": true,
+        "total_subsidies_received": 5000000,
+        "obligations_required": false,
+        "consecutive_decline_years": 1,
+        "repeat_violation": false,
+        "blocked": false,
+        "block_reason": null
+      },
+      "ias_rszh_data": {
+        "registered": true,
+        "registration_date": "2021-02-10",
+        "entity_type": "individual",
+        "name": "ИП Алексеева С.В.",
+        "region": "Алматинская область",
+        "district": "Талгарский район",
+        "subsidy_history": [
+          {
+            "year": 2024,
+            "type": "Удешевление производства молока",
+            "amount": 2000000,
+            "heads": 30,
+            "status": "executed",
+            "obligations_met": true
+          },
+          {
+            "year": 2023,
+            "type": "Приобретение племенных овец",
+            "amount": 1200000,
+            "heads": 40,
+            "status": "executed",
+            "obligations_met": false
+          }
+        ],
+        "total_subsidies_history": 3200000,
+        "pending_returns": 1
+      },
+      "easu_data": {
+        "has_account_number": true,
+        "account_numbers": ["KZ-AGR-918273"],
+        "is_spk": false,
+        "spk_members": [],
+        "spk_name": null
+      },
+      "is_iszh_data": {
+        "verified": true,
+        "animals": [
+          {
+            "tag_number": "KZ38291746",
+            "type": "cattle",
+            "breed": "Голштинская",
+            "category": "heifer",
+            "sex": "female",
+            "birth_date": "2024-03-10",
+            "age_months": 8,
+            "age_valid": true,
+            "owner_iin_bin": "920301512345",
+            "owner_match": true,
+            "previously_subsidized": false,
+            "vet_status": "healthy",
+            "last_vet_check": "2026-03-01",
+            "registration_date": "2024-05-15",
+            "rfid_tag": "RFID-3829174",
+            "rfid_active": true,
+            "rfid_last_scan": "2026-03-25",
+            "rfid_scan_count_30d": 18
+          }
+        ],
+        "total_verified": 1,
+        "total_rejected": 0,
+        "rejection_reasons": []
+      },
+      "is_esf_data": {
+        "invoices": [
+          {
+            "esf_number": "ESF-2025-9182734",
+            "date": "2025-10-05",
+            "seller_bin": "220191827364",
+            "seller_name": "ТОО \"Нур Алматы\"",
+            "buyer_iin_bin": "920301512345",
+            "total_amount": 800000,
+            "items": [
+              {
+                "description": "Молоко коровье",
+                "quantity": 200,
+                "unit": "кг",
+                "unit_price": 4000,
+                "amount": 800000
+              }
+            ],
+            "status": "confirmed",
+            "payment_confirmed": true
+          }
+        ],
+        "total_amount": 800000,
+        "invoice_count": 1
+      },
+      "egkn_data": {
+        "has_agricultural_land": true,
+        "plots": [
+          {
+            "cadastral_number": "19-382-917-482",
+            "area_hectares": 25.0,
+            "purpose": "сельскохозяйственное назначение",
+            "sub_purpose": "пашня",
+            "region": "Алматинская область",
+            "district": "Талгарский район",
+            "ownership_type": "собственность",
+            "registration_date": "2020-11-20"
+          }
+        ],
+        "total_agricultural_area": 25.0
+      },
+      "treasury_data": {
+        "payments": [
+          {
+            "payment_id": "PAY-2025-29174",
+            "amount": 2000000,
+            "status": "completed",
+            "paid_date": "2025-05-10",
+            "treasury_reference": "TR-2025-19174"
+          }
+        ]
+      }
+    },
+
+    {
+      "iin_bin": "830915301234",
+      "name": "ТОО \"Степной Ветер\"",
+      "entity_type": "legal",
+      "region": "Павлодарская область",
+      "district": "Павлодарский район",
+      "registration_date": "2016-09-01",
+      "risk_profile": "risky",
+      "giss_data": {
+        "registered": true,
+        "gross_production_previous_year": 42000000,
+        "gross_production_year_before": 50000000,
+        "growth_rate": -16.0,
+        "obligations_met": false,
+        "total_subsidies_received": 120000000,
+        "obligations_required": true,
+        "consecutive_decline_years": 2,
+        "repeat_violation": false,
+        "blocked": false,
+        "block_reason": null
+      },
+      "ias_rszh_data": {
+        "registered": true,
+        "registration_date": "2016-09-01",
+        "entity_type": "legal",
+        "name": "ТОО \"Степной Ветер\"",
+        "region": "Павлодарская область",
+        "district": "Павлодарский район",
+        "subsidy_history": [
+          {
+            "year": 2024,
+            "type": "Приобретение маточного поголовья КРС",
+            "amount": 6000000,
+            "heads": 40,
+            "status": "pending",
+            "obligations_met": false
+          },
+          {
+            "year": 2023,
+            "type": "Удешевление стоимости бычков на откормплощадку",
+            "amount": 3000000,
+            "heads": 120,
+            "status": "executed",
+            "obligations_met": true
+          },
+          {
+            "year": 2022,
+            "type": "Приобретение маточного поголовья КРС",
+            "amount": 5500000,
+            "heads": 35,
+            "status": "pending",
+            "obligations_met": false
+          }
+        ],
+        "total_subsidies_history": 14500000,
+        "pending_returns": 2
+      },
+      "easu_data": {
+        "has_account_number": true,
+        "account_numbers": ["KZ-AGR-582917"],
+        "is_spk": false,
+        "spk_members": [],
+        "spk_name": null
+      },
+      "is_iszh_data": {
+        "verified": true,
+        "animals": [
+          {
+            "tag_number": "KZ58291746",
+            "type": "cattle",
+            "breed": "Шароле",
+            "category": "heifer",
+            "sex": "female",
+            "birth_date": "2023-11-20",
+            "age_months": 11,
+            "age_valid": true,
+            "owner_iin_bin": "830915301234",
+            "owner_match": true,
+            "previously_subsidized": false,
+            "vet_status": "quarantine",
+            "last_vet_check": "2026-01-10",
+            "registration_date": "2024-01-15",
+            "rfid_tag": "RFID-5829174",
+            "rfid_active": false,
+            "rfid_last_scan": "2026-01-15",
+            "rfid_scan_count_30d": 3
+          },
+          {
+            "tag_number": "KZ58291747",
+            "type": "cattle",
+            "breed": "Лимузинская",
+            "category": "bull",
+            "sex": "male",
+            "birth_date": "2022-06-01",
+            "age_months": 26,
+            "age_valid": false,
+            "owner_iin_bin": "830915301234",
+            "owner_match": true,
+            "previously_subsidized": false,
+            "vet_status": "healthy",
+            "last_vet_check": "2026-02-20",
+            "registration_date": "2022-08-10",
+            "rfid_tag": "RFID-5829175",
+            "rfid_active": true,
+            "rfid_last_scan": "2026-03-20",
+            "rfid_scan_count_30d": 8
+          }
+        ],
+        "total_verified": 1,
+        "total_rejected": 1,
+        "rejection_reasons": []
+      },
+      "is_esf_data": {
+        "invoices": [
+          {
+            "esf_number": "ESF-2025-5829174",
+            "date": "2025-07-15",
+            "seller_bin": "160748291538",
+            "seller_name": "ТОО \"Асыл Павлодар\"",
+            "buyer_iin_bin": "830915301234",
+            "total_amount": 4000000,
+            "items": [
+              {
+                "description": "Племенные тёлки ангусской породы",
+                "quantity": 10,
+                "unit": "голова",
+                "unit_price": 400000,
+                "amount": 4000000
+              }
+            ],
+            "status": "confirmed",
+            "payment_confirmed": false
+          }
+        ],
+        "total_amount": 4000000,
+        "invoice_count": 1
+      },
+      "egkn_data": {
+        "has_agricultural_land": true,
+        "plots": [
+          {
+            "cadastral_number": "55-829-174-382",
+            "area_hectares": 180.0,
+            "purpose": "сельскохозяйственное назначение",
+            "sub_purpose": "пастбище",
+            "region": "Павлодарская область",
+            "district": "Павлодарский район",
+            "ownership_type": "аренда",
+            "registration_date": "2017-04-15"
+          }
+        ],
+        "total_agricultural_area": 180.0
+      },
+      "treasury_data": {
+        "payments": []
+      }
+    }
+  ],
+
+  "subsidy_directions": [
+    {"code": "cattle_meat", "name": "Мясное скотоводство"},
+    {"code": "cattle_dairy", "name": "Молочное скотоводство"},
+    {"code": "cattle_general", "name": "Скотоводство (общее)"},
+    {"code": "sheep", "name": "Овцеводство и козоводство"},
+    {"code": "poultry", "name": "Птицеводство"},
+    {"code": "horse", "name": "Коневодство"},
+    {"code": "pig", "name": "Свиноводство"},
+    {"code": "camel", "name": "Верблюдоводство"},
+    {"code": "beekeeping", "name": "Пчеловодство"},
+    {"code": "aquaculture", "name": "Аквакультура (рыбоводство)"},
+    {"code": "crops_grain", "name": "Зерновые и зернобобовые культуры"},
+    {"code": "crops_oilseed", "name": "Масличные культуры"},
+    {"code": "crops_cotton", "name": "Хлопководство"},
+    {"code": "crops_sugar", "name": "Сахарная свёкла"},
+    {"code": "crops_vegetables", "name": "Овощеводство и бахчеводство"},
+    {"code": "crops_fruit", "name": "Плодоводство и виноградарство"},
+    {"code": "crops_fodder", "name": "Кормовые культуры"},
+    {"code": "seed_production", "name": "Семеноводство"},
+    {"code": "fertilizers", "name": "Удобрения и средства защиты растений"},
+    {"code": "fuel", "name": "Удешевление ГСМ и энергоресурсов"},
+    {"code": "water", "name": "Водоснабжение и орошение"},
+    {"code": "equipment", "name": "С/х техника и оборудование"},
+    {"code": "processing", "name": "Переработка с/х продукции"},
+    {"code": "cooperation", "name": "С/х кооперация (СПК)"},
+    {"code": "insurance", "name": "Страхование в растениеводстве"}
+  ],
+
+  "subsidy_types_sample": [
+    {"direction": "cattle_meat", "form": 1, "name": "Приобретение маточного поголовья КРС — отечественный", "unit": "голова", "rate": 150000, "origin": "domestic", "min_age_months": 7, "max_age_months": 26},
+    {"direction": "cattle_meat", "form": 1, "name": "Приобретение маточного поголовья КРС — импорт дальнее зарубежье", "unit": "голова", "rate": 400000, "origin": "import", "min_age_months": 7, "max_age_months": 26},
+    {"direction": "cattle_dairy", "form": 6, "name": "Удешевление производства молока — от 50 голов", "unit": "кг молока", "rate": 20, "origin": "na", "min_herd_size": 50},
+    {"direction": "sheep", "form": 1, "name": "Приобретение племенных овец — отечественные", "unit": "голова", "rate": 25000, "origin": "domestic", "min_age_months": 5, "max_age_months": 18},
+    {"direction": "horse", "form": 1, "name": "Приобретение племенного жеребца-производителя — отечественный", "unit": "голова", "rate": 400000, "origin": "domestic", "min_age_months": 18, "max_age_months": 60},
+    {"direction": "equipment", "form": 31, "name": "Инвестсубсидии на приобретение трактора (отечественный)", "unit": "единица", "rate": 5000000, "origin": "domestic"}
+  ],
+
+  "regions": [
+    "Акмолинская область", "Актюбинская область", "Алматинская область",
+    "Атырауская область", "Западно-Казахстанская область", "Жамбылская область",
+    "Карагандинская область", "Костанайская область", "Кызылординская область",
+    "Мангистауская область", "Павлодарская область", "Северо-Казахстанская область",
+    "Туркестанская область", "Восточно-Казахстанская область",
+    "область Абай", "область Жетісу", "область Ұлытау"
+  ],
+
+  "scoring_config": {
+    "hybrid_formula": "0.6 × ML_score + 0.4 × rule_score",
+    "ml_model": {
+      "type": "GradientBoostingRegressor",
+      "n_estimators": 200,
+      "max_depth": 4,
+      "features_count": 20,
+      "explainability": "SHAP TreeExplainer"
+    },
+    "soft_factors": [
+      {"code": "subsidy_history", "name": "История субсидий", "max": 20, "weight": 0.20, "source": "ИАС РСЖ + БД"},
+      {"code": "production_growth", "name": "Рост валовой продукции", "max": 20, "weight": 0.20, "source": "ГИСС"},
+      {"code": "farm_size", "name": "Размер хозяйства", "max": 15, "weight": 0.15, "source": "ЕГКН + ИС ИСЖ"},
+      {"code": "efficiency", "name": "Эффективность (сохранность)", "max": 15, "weight": 0.15, "source": "ИАС РСЖ + ГИСС"},
+      {"code": "rate_compliance", "name": "Соответствие нормативу", "max": 10, "weight": 0.10, "source": "ИС ЭСФ"},
+      {"code": "region_priority", "name": "Региональный приоритет", "max": 10, "weight": 0.10, "source": "Справочник МСХ"},
+      {"code": "entity_type", "name": "Тип заявителя", "max": 5, "weight": 0.05, "source": "ЕАСУ"},
+      {"code": "applicant_history", "name": "Первичность заявителя", "max": 5, "weight": 0.05, "source": "ИАС РСЖ + БД"}
+    ],
+    "hard_filters_count": 15,
+    "recommendation_thresholds": {
+      "approve": "≥ 70",
+      "review": "40–69",
+      "reject": "< 40"
+    }
+  },
+
+  "ml_features": [
+    {"name": "giss_registered", "description": "Регистрация в ГИСС", "type": "bool", "source": "ГИСС"},
+    {"name": "growth_rate", "description": "Темп роста валовой продукции (%)", "type": "float", "source": "ГИСС"},
+    {"name": "gross_production_prev", "description": "Валовая продукция пред. год (млн ₸)", "type": "float", "source": "ГИСС"},
+    {"name": "gross_production_before", "description": "Валовая продукция год ранее (млн ₸)", "type": "float", "source": "ГИСС"},
+    {"name": "obligations_met", "description": "Встречные обязательства выполнены", "type": "bool", "source": "ГИСС"},
+    {"name": "total_subsidies_received", "description": "Общая сумма субсидий (млн ₸)", "type": "float", "source": "ГИСС"},
+    {"name": "ias_registered", "description": "Регистрация в ИАС РСЖ", "type": "bool", "source": "ИАС РСЖ"},
+    {"name": "subsidy_history_count", "description": "Количество субсидий в истории", "type": "int", "source": "ИАС РСЖ"},
+    {"name": "subsidy_success_rate", "description": "Доля успешных субсидий", "type": "float", "source": "ИАС РСЖ"},
+    {"name": "pending_returns", "description": "Невозвращённые субсидии", "type": "int", "source": "ИАС РСЖ"},
+    {"name": "total_verified_animals", "description": "Верифицированных животных", "type": "int", "source": "ИС ИСЖ"},
+    {"name": "total_rejected_animals", "description": "Отклонённых животных", "type": "int", "source": "ИС ИСЖ"},
+    {"name": "animal_age_valid_ratio", "description": "Доля животных с допустимым возрастом", "type": "float", "source": "ИС ИСЖ"},
+    {"name": "esf_total_amount", "description": "Общая сумма ЭСФ (млн ₸)", "type": "float", "source": "ИС ЭСФ"},
+    {"name": "esf_invoice_count", "description": "Количество ЭСФ", "type": "int", "source": "ИС ЭСФ"},
+    {"name": "esf_confirmed_ratio", "description": "Доля подтверждённых ЭСФ", "type": "float", "source": "ИС ЭСФ"},
+    {"name": "has_agricultural_land", "description": "Наличие с/х земли", "type": "bool", "source": "ЕГКН"},
+    {"name": "total_agricultural_area", "description": "Площадь с/х земли (га)", "type": "float", "source": "ЕГКН"},
+    {"name": "entity_type_encoded", "description": "Тип заявителя (0=физлицо, 1=юрлицо, 2=СПК)", "type": "int", "source": "ЕАСУ"},
+    {"name": "treasury_payment_count", "description": "Количество платежей через Казначейство", "type": "int", "source": "Казначейство"}
+  ]
+}
