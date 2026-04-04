@@ -240,14 +240,16 @@
             </span>
             <div class="w-px h-6 bg-gray-200"></div>
             <button @click="openModal('approved')"
+                    data-testid="batch-approve"
                     class="btn-lime inline-flex items-center gap-1.5 text-xs py-2 px-4 rounded-xl font-semibold">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                Одобрить выбранные
+                Массовое одобрение
             </button>
             <button @click="openModal('rejected')"
+                    data-testid="batch-reject"
                     class="inline-flex items-center gap-1.5 text-xs py-2 px-4 rounded-xl font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                Отклонить выбранные
+                Массово�� отклонение
             </button>
             <button @click="selected = []; selectAll = false;"
                     class="text-xs text-gray-400 hover:text-gray-600 transition-colors ml-1">

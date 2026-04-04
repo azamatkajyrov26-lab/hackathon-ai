@@ -215,6 +215,19 @@
                     {% if animal_summary.total > 0 %}
                     <p class="text-xs mt-1 text-gray-600">≈ {{ pasture_area|floatformat:0 }} га / {{ animal_summary.total }} голов</p>
                     {% endif %}
+                    {% if pasture_norms %}
+                    <div class="mt-3 border-t border-gray-100 pt-2">
+                        <p class="text-[10px] font-semibold text-gray-500 mb-1">Нормы га/голова ({{ pasture_norms.zone }}):</p>
+                        <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                            {% for pt in pasture_norms.per_type %}
+                            <div class="flex justify-between text-xs">
+                                <span class="text-gray-600">{{ pt.name }}</span>
+                                <span class="font-mono font-semibold text-gray-800">{{ pt.norm }} га</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
                     <span class="inline-block mt-2 badge-success text-[10px] px-2 py-0.5 rounded-md"><i class="fas fa-check mr-0.5"></i>Приказ №3-3/332</span>
                     {% else %}
                     <p class="text-sm text-gray-400">Нет данных</p>

@@ -84,8 +84,8 @@
             </div>
             <p class="text-sm text-gray-500 mt-1">{{ app.applicant.name }} · {{ app.region }}{% if app.district %}, {{ app.district }}{% endif %}</p>
             {% if user_role != 'applicant' %}
-            <a href="{% url 'application_pdf' app.id %}" class="inline-flex items-center gap-2 mt-2 px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                <i class="fas fa-file-pdf text-red-500"></i> Скачать PDF
+            <a href="{% url 'application_pdf' app.id %}" data-testid="pdf-download" class="inline-flex items-center gap-2 mt-2 px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                <i class="fas fa-file-pdf text-red-500"></i> Скачать PDF отчёт
             </a>
             {% endif %}
         </div>
@@ -641,6 +641,56 @@
                         </span>
                     </div>
                 </div>
+
+                <!-- Detailed explanation -->
+                <div class="mt-6 p-5 rounded-xl bg-gray-50 border border-gray-200">
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                        <i class="fas fa-info-circle mr-1"></i> Детальное объяснение оценки
+                    </h4>
+                    <div class="space-y-3 text-xs text-gray-600">
+                        <div class="p-3 rounded-lg bg-white border border-gray-100">
+                            <p class="font-semibold text-gray-700 mb-1">Как формируется итоговый балл:</p>
+                            <p>Итоговый балл = <strong>ML модель × 0.6</strong> + <strong>Правила (8 факторов) × 0.4</strong>. ML модель (GradientBoosting) обучена на исторических данных субсидий. Правила — экспертная оценка по 8 факторам на основе данных из 7 государственных систем.</p>
+                        </div>
+                        <div class="p-3 rounded-lg bg-white border border-gray-100">
+                            <p class="font-semibold text-gray-700 mb-1">8 факторов правил:</p>
+                            <ol class="list-decimal ml-4 space-y-0.5">
+                                <li><strong>История субсидий</strong> — доля успешных заявок, сумма полученных субсидий (ИАС РСЖ)</li>
+                                <li><strong>Контробязательства</strong> — выполнение встречных обязательств (ИАС РСЖ)</li>
+                                <li><strong>Размер хозяйства</strong> — поголовье + нагрузка на пастбища, Приказ №3-3/332 (ИС ИЖС, ЕГКН)</li>
+                                <li><strong>Эффективность</strong> — продуктивность + падёж скота, Приказ №3-3/1061 (ГИСС, ИС ИЖС)</li>
+                                <li><strong>Финансовая устойчивость</strong> — обороты, налоги (ЭСФ, Казначейство)</li>
+                                <li><strong>Регистрация</strong> — наличие и актуальность в госреестре (ЕАСУ)</li>
+                                <li><strong>Земельные ресурсы</strong> — наличие земли, соответствие нормам (ЕГКН)</li>
+                                <li><strong>Идентификация животных</strong> — % идентифицированных (ИС ИЖС)</li>
+                            </ol>
+                        </div>
+                        <div class="p-3 rounded-lg bg-white border border-gray-100">
+                            <p class="font-semibold text-gray-700 mb-1">18 hard-фильтров (бинарные проверки):</p>
+                            <p>Перед скорингом проверяются 18 обязательных условий. Фильтры 1-15 — базовые требования (регистрация, налоги, блокировки). Фильтры 16-18 — регуляторные нормы:</p>
+                            <ul class="list-disc ml-4 mt-1 space-y-0.5">
+                                <li><strong>Фильтр 16</strong>: Падёж скота в пределах нормы (Приказ №3-3/1061)</li>
+                                <li><strong>Фильтр 17</strong>: Нагрузка на пастбища (Приказ №3-3/332)</li>
+                                <li><strong>Фильтр 18</strong>: Племенное свидетельство (Приказ №108)</li>
+                            </ul>
+                            <p class="mt-1 text-gray-500">Если хотя бы один hard-фильтр не пройден — заявитель уведомляется о необходимости исправлений.</p>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-center">
+                            <div class="p-2 rounded-lg bg-green-50 border border-green-200">
+                                <div class="text-[10px] text-green-600 font-semibold">70+ баллов</div>
+                                <div class="text-xs font-bold text-green-800">Одобрить</div>
+                            </div>
+                            <div class="p-2 rounded-lg bg-yellow-50 border border-yellow-200">
+                                <div class="text-[10px] text-yellow-600 font-semibold">40-69 баллов</div>
+                                <div class="text-xs font-bold text-yellow-800">На рассмотрение</div>
+                            </div>
+                            <div class="p-2 rounded-lg bg-red-50 border border-red-200">
+                                <div class="text-[10px] text-red-600 font-semibold">&lt;40 баллов</div>
+                                <div class="text-xs font-bold text-red-800">Отклонить</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 {% else %}
                 <p class="text-gray-400 text-sm">Скоринг не выполнялся</p>
                 {% endif %}
@@ -785,8 +835,8 @@
             </div>
 
             {% if can_decide %}
-            <div class="card-glass p-6">
-                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="fas fa-stamp mr-1"></i> Принять решение</h3>
+            <div class="card-glass p-6" data-testid="decision-panel">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="fas fa-stamp mr-1"></i> Принять решение (Одобрить / Отклонить)</h3>
                 <form method="post" action="/applications/{{ app.id }}/decide/">
                     {% csrf_token %}
                     <div class="space-y-4">

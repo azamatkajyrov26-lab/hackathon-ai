@@ -66,25 +66,6 @@
             margin-bottom: 1.2rem; display: flex; align-items: center; gap: .5rem;
         }
 
-        /* ── TAB SWITCHER ── */
-        .tab-switcher {
-            display: flex; gap: 0; margin-bottom: 1.5rem;
-            background: #F3F4F6; border-radius: .6rem; padding: 4px;
-        }
-        .tab-btn {
-            flex: 1; padding: .7rem .5rem; border: none; background: transparent;
-            font-family: 'Inter', sans-serif; font-size: .85rem; font-weight: 600;
-            color: #6B7280; cursor: pointer; border-radius: .45rem;
-            transition: all .25s; display: flex; align-items: center; justify-content: center; gap: .4rem;
-        }
-        .tab-btn.active {
-            background: #fff; color: #1A1A2E;
-            box-shadow: 0 1px 3px rgba(0,0,0,.1);
-        }
-        .tab-btn:hover:not(.active) { color: #374151; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-
         /* Form */
         .form-group { margin-bottom: 1.25rem; }
         .form-group label {
@@ -120,19 +101,10 @@
             font-family: 'Inter', sans-serif; font-size: 1rem; font-weight: 700; cursor: pointer;
             transition: background .2s, transform .15s;
             display: flex; align-items: center; justify-content: center; gap: .5rem;
-        }
-        .btn-submit:hover { transform: translateY(-1px); }
-        .btn-submit:active { transform: translateY(0); }
-
-        .btn-ecp {
-            background: #1A1A2E; color: #C1FF00;
-        }
-        .btn-ecp:hover { background: #252547; }
-
-        .btn-password {
             background: #C1FF00; color: #1A1A2E;
         }
-        .btn-password:hover { background: #A8E000; }
+        .btn-submit:hover { background: #A8E000; transform: translateY(-1px); }
+        .btn-submit:active { transform: translateY(0); }
 
         .back-link {
             display: block; text-align: center; margin-top: 1.2rem;
@@ -141,52 +113,9 @@
         .back-link a { color: #1A1A2E; font-weight: 600; text-decoration: none; }
         .back-link a:hover { text-decoration: underline; }
 
-        /* ── ECP VISUAL ── */
-        .ecp-info {
-            background: linear-gradient(135deg, #F0FDF4, #ECFDF5);
-            border: 1.5px solid #BBF7D0;
-            border-radius: .75rem; padding: 1rem 1.2rem;
-            margin-bottom: 1.25rem;
-        }
-        .ecp-info h4 { font-size: .82rem; font-weight: 700; color: #166534; margin-bottom: .4rem; display: flex; align-items: center; gap: .4rem; }
-        .ecp-info p { font-size: .78rem; color: #15803D; line-height: 1.5; }
-
-        .ecp-steps {
-            display: flex; align-items: center; gap: .5rem;
-            margin-bottom: 1.5rem; padding: 0 .25rem;
-        }
-        .ecp-step {
-            display: flex; align-items: center; gap: .4rem;
-            font-size: .72rem; color: #6B7280; font-weight: 500;
-        }
-        .ecp-step .step-num {
-            width: 22px; height: 22px; border-radius: 50%;
-            background: #E5E7EB; color: #6B7280;
-            display: flex; align-items: center; justify-content: center;
-            font-size: .7rem; font-weight: 700;
-        }
-        .ecp-step.active .step-num { background: #C1FF00; color: #1A1A2E; }
-        .ecp-step.done .step-num { background: #22C55E; color: #fff; }
-        .ecp-arrow { color: #D1D5DB; font-size: .7rem; }
-
-        /* ── ECP ANIMATION ── */
-        .ecp-signing {
-            display: none; flex-direction: column; align-items: center;
-            padding: 2rem 0; gap: 1rem;
-        }
-        .ecp-signing.active { display: flex; }
-        .ecp-spinner {
-            width: 56px; height: 56px; border-radius: 50%;
-            border: 4px solid #E5E7EB; border-top-color: #C1FF00;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .ecp-signing .sign-text { font-size: .9rem; font-weight: 600; color: #374151; }
-        .ecp-signing .sign-sub { font-size: .78rem; color: #9CA3AF; }
-
         /* ── DEMO ACCOUNTS ── */
         .demo-section {
-            margin-top: 2rem; padding-top: 1.5rem;
+            margin-top: 1.5rem; padding-top: 1.2rem;
             border-top: 1px solid #E5E7EB;
         }
         .demo-section h3 {
@@ -204,7 +133,6 @@
         .demo-item:hover { border-color: #C1FF00; background: rgba(193,255,0,.04); }
         .demo-role { font-size: .65rem; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .1rem; }
         .demo-cred { font-size: .78rem; font-weight: 600; color: #1F2937; font-family: 'Courier New', monospace; }
-        .demo-iin { font-size: .72rem; color: #9CA3AF; font-family: 'Courier New', monospace; margin-top: .1rem; }
 
         /* ── RESPONSIVE ── */
         @media (max-width: 860px) {
@@ -224,13 +152,6 @@
     <div class="left-logo">Subsidy<span>AI</span></div>
     <p class="left-tagline">Интеллектуальная система скоринга сельскохозяйственных субсидий Республики Казахстан</p>
     <ul class="left-features">
-        <li>
-            <div class="feat-icon"><i class="fas fa-key"></i></div>
-            <div class="feat-text">
-                <h4>Вход через ЭЦП</h4>
-                <p>Авторизация через электронную цифровую подпись. Данные загружаются из 7 государственных систем автоматически.</p>
-            </div>
-        </li>
         <li>
             <div class="feat-icon"><i class="fas fa-shield-halved"></i></div>
             <div class="feat-text">
@@ -252,6 +173,13 @@
                 <p>Ранжированный список заявок для объективного решения комиссии.</p>
             </div>
         </li>
+        <li>
+            <div class="feat-icon"><i class="fas fa-users"></i></div>
+            <div class="feat-text">
+                <h4>Ролевой доступ</h4>
+                <p>Заявитель, специалист МИО, комиссия, руководитель — каждый видит свой интерфейс.</p>
+            </div>
+        </li>
     </ul>
     <div class="left-bottom">&copy; 2026 SubsidyAI &mdash; Hackathon AI</div>
 </div>
@@ -266,7 +194,7 @@
 
         <div class="form-header">
             <h1>Вход в систему</h1>
-            <p>Авторизуйтесь через ЭЦП или служебный аккаунт</p>
+            <p>Введите логин и пароль для доступа к системе</p>
         </div>
 
         {% if messages %}
@@ -275,118 +203,89 @@
         {% endfor %}
         {% endif %}
 
-        <!-- TAB SWITCHER -->
-        <div class="tab-switcher">
-            <button class="tab-btn active" onclick="switchTab('ecp')" id="tab-btn-ecp">
-                <i class="fas fa-key"></i> Вход через ЭЦП
-            </button>
-            <button class="tab-btn" onclick="switchTab('password')" id="tab-btn-password">
-                <i class="fas fa-user-tie"></i> Служебный вход
-            </button>
-        </div>
-
-        <!-- ═══════ TAB: ECP ═══════ -->
-        <div class="tab-content active" id="tab-ecp">
-            <div class="ecp-info">
-                <h4><i class="fas fa-certificate"></i> Электронная цифровая подпись</h4>
-                <p>Введите ИИН/БИН вашей организации. Система автоматически загрузит все данные из государственных информационных систем.</p>
-            </div>
-
-            <div class="ecp-steps" id="ecp-steps">
-                <div class="ecp-step active" id="step-1">
-                    <span class="step-num">1</span> Ввод ИИН/БИН
-                </div>
-                <span class="ecp-arrow"><i class="fas fa-chevron-right"></i></span>
-                <div class="ecp-step" id="step-2">
-                    <span class="step-num">2</span> Подпись ЭЦП
-                </div>
-                <span class="ecp-arrow"><i class="fas fa-chevron-right"></i></span>
-                <div class="ecp-step" id="step-3">
-                    <span class="step-num">3</span> Загрузка данных
+        <form method="POST" action="">
+            {% csrf_token %}
+            <input type="hidden" name="login_mode" value="password">
+            <div class="form-group">
+                <label for="username">Логин</label>
+                <div class="input-wrap">
+                    <i class="fas fa-user field-icon"></i>
+                    <input type="text" id="username" name="username" placeholder="Введите логин" autocomplete="username" required>
                 </div>
             </div>
-
-            <form method="POST" action="" id="ecp-form">
-                {% csrf_token %}
-                <input type="hidden" name="login_mode" value="ecp">
-                <div class="form-group">
-                    <label for="iin_bin">ИИН / БИН</label>
-                    <div class="input-wrap">
-                        <i class="fas fa-id-card field-icon"></i>
-                        <input type="text" id="iin_bin" name="iin_bin" placeholder="Введите 12-значный ИИН или БИН"
-                               maxlength="12" pattern="\d{12}" inputmode="numeric" autocomplete="off" required>
-                    </div>
+            <div class="form-group">
+                <label for="password">Пароль</label>
+                <div class="input-wrap">
+                    <i class="fas fa-lock field-icon"></i>
+                    <input type="password" id="password" name="password" placeholder="Введите пароль" autocomplete="current-password" required>
+                    <button type="button" class="password-toggle" onclick="togglePassword()">
+                        <i class="fas fa-eye" id="eye-icon"></i>
+                    </button>
                 </div>
-
-                <button type="submit" class="btn-submit btn-ecp" id="btn-ecp-submit">
-                    <i class="fas fa-key"></i> Подписать и войти через ЭЦП
-                </button>
-            </form>
-
-            <!-- Signing animation (shown during submit) -->
-            <div class="ecp-signing" id="ecp-signing">
-                <div class="ecp-spinner"></div>
-                <div class="sign-text">Подписание ЭЦП...</div>
-                <div class="sign-sub">Загрузка данных из государственных систем</div>
             </div>
+            <button type="submit" class="btn-submit"><i class="fas fa-right-to-bracket"></i> Войти</button>
+        </form>
 
-            <!-- Demo applicant IINs -->
-            <div class="demo-section">
-                <h3><i class="fas fa-flask"></i> Демо ИИН/БИН (заявители)</h3>
-                <div class="demo-grid" id="demo-ecp-grid">
-                    <!-- filled by JS -->
+        <!-- DEMO: Заявители -->
+        <div class="demo-section">
+            <h3><i class="fas fa-tractor"></i> Демо: Заявители (фермеры)</h3>
+            <div class="demo-grid">
+                <div class="demo-item" onclick="fillLogin('bereke','demo123')">
+                    <span class="demo-role">СПК "Береке Астана"</span>
+                    <span class="demo-cred">bereke / demo123</span>
+                    <span style="font-size:.68rem;color:#16A34A;font-weight:700;margin-top:2px">ОДОБРЕНИЕ — Опытный, 8 голов</span>
+                </div>
+                <div class="demo-item" onclick="fillLogin('zhumabaev','demo123')">
+                    <span class="demo-role">КХ "Жумабаев Н."</span>
+                    <span class="demo-cred">zhumabaev / demo123</span>
+                    <span style="font-size:.68rem;color:#16A34A;font-weight:700;margin-top:2px">ОДОБРЕНИЕ — 3 головы</span>
+                </div>
+                <div class="demo-item" onclick="fillLogin('tastemirova','demo123')">
+                    <span class="demo-role">ИП Тастемирова А.</span>
+                    <span class="demo-cred">tastemirova / demo123</span>
+                    <span style="font-size:.68rem;color:#16A34A;font-weight:700;margin-top:2px">ОДОБРЕНИЕ — Импортный скот</span>
+                </div>
+                <div class="demo-item" onclick="fillLogin('abramova','demo123')">
+                    <span class="demo-role">ИП Абрамова С.</span>
+                    <span class="demo-cred">abramova / demo123</span>
+                    <span style="font-size:.68rem;color:#DC2626;font-weight:700;margin-top:2px">ОТКАЗ — Новенькая</span>
+                </div>
+                <div class="demo-item" onclick="fillLogin('dala_agro','demo123')">
+                    <span class="demo-role">ТОО "Дала Агро"</span>
+                    <span class="demo-cred">dala_agro / demo123</span>
+                    <span style="font-size:.68rem;color:#DC2626;font-weight:700;margin-top:2px">ОТКАЗ — Блок ГИСС</span>
+                </div>
+                <div class="demo-item" onclick="fillLogin('ospanov','demo123')">
+                    <span class="demo-role">КХ "Оспанов"</span>
+                    <span class="demo-cred">ospanov / demo123</span>
+                    <span style="font-size:.68rem;color:#D97706;font-weight:700;margin-top:2px">РАССМОТРЕНИЕ</span>
                 </div>
             </div>
         </div>
 
-        <!-- ═══════ TAB: PASSWORD ═══════ -->
-        <div class="tab-content" id="tab-password">
-            <form method="POST" action="">
-                {% csrf_token %}
-                <input type="hidden" name="login_mode" value="password">
-                <div class="form-group">
-                    <label for="username">Имя пользователя</label>
-                    <div class="input-wrap">
-                        <i class="fas fa-user field-icon"></i>
-                        <input type="text" id="username" name="username" placeholder="Введите логин" autocomplete="username" required>
-                    </div>
+        <!-- DEMO: Служебные -->
+        <div class="demo-section" style="margin-top: 1rem; padding-top: 1rem;">
+            <h3><i class="fas fa-building-columns"></i> Демо: Служебные аккаунты</h3>
+            <div class="demo-grid">
+                <div class="demo-item" onclick="fillLogin('specialist','demo123')">
+                    <span class="demo-role">Специалист МИО</span>
+                    <span class="demo-cred">specialist / demo123</span>
                 </div>
-                <div class="form-group">
-                    <label for="password">Пароль</label>
-                    <div class="input-wrap">
-                        <i class="fas fa-lock field-icon"></i>
-                        <input type="password" id="password" name="password" placeholder="Введите пароль" autocomplete="current-password" required>
-                        <button type="button" class="password-toggle" onclick="togglePassword()">
-                            <i class="fas fa-eye" id="eye-icon"></i>
-                        </button>
-                    </div>
+                <div class="demo-item" onclick="fillLogin('commission','demo123')">
+                    <span class="demo-role">Член комиссии</span>
+                    <span class="demo-cred">commission / demo123</span>
                 </div>
-                <button type="submit" class="btn-submit btn-password"><i class="fas fa-right-to-bracket"></i> Войти</button>
-            </form>
-
-            <div class="demo-section">
-                <h3><i class="fas fa-flask"></i> Демо-аккаунты (служебные)</h3>
-                <div class="demo-grid">
-                    <div class="demo-item" onclick="fillLogin('specialist','demo123')">
-                        <span class="demo-role">Специалист МИО</span>
-                        <span class="demo-cred">specialist / demo123</span>
-                    </div>
-                    <div class="demo-item" onclick="fillLogin('commission','demo123')">
-                        <span class="demo-role">Член комиссии</span>
-                        <span class="demo-cred">commission / demo123</span>
-                    </div>
-                    <div class="demo-item" onclick="fillLogin('head','demo123')">
-                        <span class="demo-role">Руководитель МИО</span>
-                        <span class="demo-cred">head / demo123</span>
-                    </div>
-                    <div class="demo-item" onclick="fillLogin('admin','demo123')">
-                        <span class="demo-role">Администратор</span>
-                        <span class="demo-cred">admin / demo123</span>
-                    </div>
-                    <div class="demo-item" onclick="fillLogin('auditor','demo123')">
-                        <span class="demo-role">Аудитор</span>
-                        <span class="demo-cred">auditor / demo123</span>
-                    </div>
+                <div class="demo-item" onclick="fillLogin('head','demo123')">
+                    <span class="demo-role">Руководитель МИО</span>
+                    <span class="demo-cred">head / demo123</span>
+                </div>
+                <div class="demo-item" onclick="fillLogin('admin','demo123')">
+                    <span class="demo-role">Администратор</span>
+                    <span class="demo-cred">admin / demo123</span>
+                </div>
+                <div class="demo-item" onclick="fillLogin('auditor','demo123')">
+                    <span class="demo-role">Аудитор</span>
+                    <span class="demo-cred">auditor / demo123</span>
                 </div>
             </div>
         </div>
@@ -396,17 +295,7 @@
 </div>
 
 <script>
-/* ── Tab switching ── */
-function switchTab(tab) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.getElementById('tab-btn-' + tab).classList.add('active');
-    document.getElementById('tab-' + tab).classList.add('active');
-}
-
-/* ── Password form helpers ── */
 function fillLogin(user, pass) {
-    switchTab('password');
     document.getElementById('username').value = user;
     document.getElementById('password').value = pass;
 }
@@ -422,62 +311,6 @@ function togglePassword() {
         icon.classList.replace('fa-eye-slash', 'fa-eye');
     }
 }
-
-/* ── ECP form: fill IIN and show signing animation ── */
-function fillEcp(iin) {
-    switchTab('ecp');
-    document.getElementById('iin_bin').value = iin;
-}
-
-document.getElementById('ecp-form').addEventListener('submit', function(e) {
-    const iin = document.getElementById('iin_bin').value.trim();
-    if (iin.length !== 12 || !/^\d{12}$/.test(iin)) return;
-
-    // Show signing animation
-    document.getElementById('btn-ecp-submit').style.display = 'none';
-    document.getElementById('ecp-signing').classList.add('active');
-
-    // Animate steps
-    document.getElementById('step-1').classList.remove('active');
-    document.getElementById('step-1').classList.add('done');
-    document.getElementById('step-2').classList.add('active');
-
-    setTimeout(function() {
-        document.getElementById('step-2').classList.remove('active');
-        document.getElementById('step-2').classList.add('done');
-        document.getElementById('step-3').classList.add('active');
-        document.querySelector('.sign-text').textContent = 'Загрузка данных из госсистем...';
-        document.querySelector('.sign-sub').textContent = 'ГИСС, ИАС РСЖ, ЕГКН, ИС ИСЖ, ИС ЭСФ, ЕАСУ';
-    }, 800);
-});
-
-/* ── Demo applicant IINs (hardcoded personas) ── */
-(function() {
-    const demos = [
-        { iin: '950315400123', name: 'ИП Абрамова С.', desc: 'Новенькая, ничего нет', result: 'ОТКАЗ', color: '#DC2626' },
-        { iin: '880720300456', name: 'СПК "Береке Астана"', desc: 'Опытный, СПК, 8 голов', result: 'ОДОБРЕНИЕ', color: '#16A34A' },
-        { iin: '901105200789', name: 'КХ "Жумабаев Н."', desc: 'Готов к подаче, 3 головы', result: 'ОДОБРЕНИЕ', color: '#16A34A' },
-        { iin: '850930100234', name: 'ТОО "Дала Агро"', desc: 'Заблокирован в ГИСС', result: 'ОТКАЗ', color: '#DC2626' },
-        { iin: '920812500567', name: 'ИП Тастемирова А.', desc: 'Импортный скот', result: 'ОДОБРЕНИЕ', color: '#16A34A' },
-        { iin: '870325100890', name: 'КХ "Оспанов"', desc: 'Частичные проблемы', result: 'РАССМОТРЕНИЕ', color: '#D97706' },
-    ];
-    const grid = document.getElementById('demo-ecp-grid');
-    demos.forEach(function(d) {
-        const div = document.createElement('div');
-        div.className = 'demo-item';
-        div.onclick = function() { fillEcp(d.iin); };
-        div.innerHTML =
-            '<span class="demo-role">' + d.name + '</span>' +
-            '<span class="demo-iin">' + d.iin + '</span>' +
-            '<span style="font-size:.68rem;color:' + d.color + ';font-weight:700;margin-top:2px">' + d.result + ' — ' + d.desc + '</span>';
-        grid.appendChild(div);
-    });
-})();
-
-/* ── IIN input: only digits ── */
-document.getElementById('iin_bin').addEventListener('input', function(e) {
-    this.value = this.value.replace(/\D/g, '').substring(0, 12);
-});
 </script>
 </body>
 </html>

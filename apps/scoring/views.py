@@ -1302,6 +1302,32 @@ def batch_decide(request):
     })
 
 
+def _calc_pasture_norms(region, egkn_data):
+    """Рассчитывает нормы га/голова для каждого вида животных по региону."""
+    from apps.scoring.hard_filters import PASTURE_LOAD_NORMS, DEFAULT_PASTURE_NORM
+
+    zone = egkn_data.get('pasture_zone', 'restored')
+    # Ищем норму по региону
+    base_norm = DEFAULT_PASTURE_NORM
+    if region:
+        for key, val in PASTURE_LOAD_NORMS.items():
+            if key[0] in (region or '') or (region or '') in key[0]:
+                if key[1] == zone:
+                    base_norm = val
+                    break
+
+    return {
+        'base_norm': base_norm,
+        'zone': zone,
+        'per_type': [
+            {'name': 'КРС', 'code': 'cattle', 'coeff': 1.0, 'norm': round(base_norm, 1)},
+            {'name': 'Овцы/козы', 'code': 'sheep', 'coeff': 0.2, 'norm': round(base_norm * 0.2, 1)},
+            {'name': 'Лошади', 'code': 'horse', 'coeff': 1.5, 'norm': round(base_norm * 1.5, 1)},
+            {'name': 'Верблюды', 'code': 'camel', 'coeff': 2.0, 'norm': round(base_norm * 2.0, 1)},
+        ],
+    }
+
+
 @role_required('applicant')
 def farmer_dashboard(request):
     """Личный кабинет фермера — данные из всех внешних систем."""
@@ -1578,6 +1604,7 @@ def farmer_dashboard(request):
         'mortality_data': mortality_data,
         'pasture_area': egkn.get('pasture_area', 0),
         'pasture_zone': egkn.get('pasture_zone', ''),
+        'pasture_norms': _calc_pasture_norms(entity.region, egkn),
     }
     return render(request, 'scoring/farmer_dashboard.html', context)
 
@@ -2583,6 +2610,27 @@ def api_check_duplicate(request):
             'app_status': dup.status,
         })
     return JsonResponse({'duplicate': False})
+
+
+@login_required
+def api_check_duplicates_bulk(request):
+    """Возвращает список типов субсидий, на которые у заявителя уже есть заявки в текущем году."""
+    iin_bin = request.GET.get('iin_bin', '')
+    if not iin_bin:
+        return JsonResponse({'duplicates': {}})
+    from django.utils import timezone as tz
+    apps = Application.objects.filter(
+        applicant__iin_bin=iin_bin,
+        created_at__year=tz.now().year,
+    ).exclude(status='rejected').select_related('subsidy_type')
+    duplicates = {}
+    for app in apps:
+        duplicates[str(app.subsidy_type_id)] = {
+            'app_number': app.number,
+            'app_status': app.status,
+            'status_display': app.get_status_display(),
+        }
+    return JsonResponse({'duplicates': duplicates})
 
 
 @login_required

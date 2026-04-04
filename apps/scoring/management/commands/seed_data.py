@@ -293,34 +293,33 @@ class Command(BaseCommand):
                 )
         self.stdout.write(f'Created budgets for {len(REGIONS)} regions x {SubsidyDirection.objects.count()} directions')
 
-        # Demo users — ALL 6 roles including farmers
-        # Farmers linked to demo IINs shown on login page
+        # Demo users — ALL roles including farmers
+        # Password is ALWAYS reset to ensure demo login works after every restart
         demo_users = [
-            # Фермеры / Заявители (iin_bin привязан к EmulatedEntity)
-            ('farmer1', 'demo123', 'Касымов', 'Ерлан', 'applicant', 'Акмолинская область', 'ТОО "Агрофирма Степь"', '880720300456'),
-            ('farmer2', 'demo123', 'Жумабаев', 'Нурсултан', 'applicant', 'Костанайская область', 'КХ "Жумабаев"', '901105200789'),
-            ('farmer3', 'demo123', 'Ахметова', 'Айгуль', 'applicant', 'Алматинская область', 'ИП Ахметова А.', '950315400123'),
-            ('farmer4', 'demo123', 'Тулебаев', 'Марат', 'applicant', 'Туркестанская область', 'СПК "Береке"', '850930100234'),
-            ('farmer5', 'demo123', 'Сатпаев', 'Дархан', 'applicant', 'Павлодарская область', 'ТОО "Нур Дала"', '920812500567'),
+            # Заяв��тели (фермеры) — логин совпадает с демо-карточками на login page
+            ('bereke', 'demo123', 'Касымов', 'Ерлан', 'applicant', 'Акмолинская область', 'СПК "Береке Астана"', '880720300456'),
+            ('zhumabaev', 'demo123', 'Жумабаев', 'Нурлан', 'applicant', 'Костанайская область', 'КХ "Жумабаев Н."', '901105200789'),
+            ('abramova', 'demo123', 'Абрамова', 'София', 'applicant', 'Алматинская область', 'ИП Абрамова С.', '950315400123'),
+            ('dala_agro', 'demo123', 'Смагулов', 'Кайрат', 'applicant', 'Туркестанская область', 'ТОО "Дала Агро"', '850930100234'),
+            ('tastemirova', 'demo123', 'Тастемирова', 'Айгуль', 'applicant', 'Павлодарская область', 'ИП Тастемирова А.', '920812500567'),
+            ('ospanov', 'demo123', 'Оспанов', 'Бауржан', 'applicant', 'Карагандинская область', 'КХ "Оспанов"', '870325100890'),
             # Специалисты МИО
-            ('specialist', 'demo123', 'Сериков', 'Алмас', 'mio_specialist', 'Акмолинская область', 'Управление с/х Акмолинской области'),
-            ('specialist2', 'demo123', 'Муратова', 'Жанна', 'mio_specialist', 'Костанайская область', 'Управление с/х Костанайской области'),
+            ('specialist', 'demo123', 'Нурланов', 'Бекзат', 'mio_specialist', 'Акмолинская область', 'Управление с/х Акмолинской области'),
             # Комиссия
-            ('commission', 'demo123', 'Иванов', 'Петр', 'commission_member', 'Акмолинская область', 'Комиссия по субсидированию'),
-            ('commission2', 'demo123', 'Омарова', 'Гульнар', 'commission_member', 'Костанайская область', 'Комиссия по субсидированию'),
+            ('commission', 'demo123', 'Калиева', 'Дана', 'commission_member', 'Акмолинская область', 'Комиссия по субсидированию'),
             # Руководители
-            ('head', 'demo123', 'Нурланов', 'Кайрат', 'mio_head', 'Акмолинская область', 'Управление с/х Акмолинской области'),
-            ('head2', 'demo123', 'Байтурсынов', 'Асхат', 'mio_head', 'Костанайская область', 'Управление с/х Костанайской области'),
+            ('head', 'demo123', 'Сериков', 'Арман', 'mio_head', 'Акмолинская область', 'Управление с/х Акмолинской области'),
             # Администратор
             ('admin', 'demo123', 'Администратор', 'Системы', 'admin', '', 'SubsidyAI'),
             # Аудитор
-            ('auditor', 'demo123', 'Аудитор', 'Системный', 'auditor', '', 'Комитет внутреннего аудита МСХ РК'),
+            ('auditor', 'demo123', 'Аубакиров', 'Серик', 'auditor', '', 'Комитет внутреннего аудита МСХ РК'),
         ]
         for row in demo_users:
             username, password, last_name, first_name, role, region = row[:6]
             organization = row[6] if len(row) > 6 else ''
             iin_bin = row[7] if len(row) > 7 else ''
-            user, created_user = User.objects.get_or_create(
+
+            user, _ = User.objects.get_or_create(
                 username=username,
                 defaults={
                     'first_name': first_name,
@@ -329,9 +328,20 @@ class Command(BaseCommand):
                     'is_superuser': role == 'admin',
                 },
             )
-            if created_user:
-                user.set_password(password)
-                user.save()
+            # ALWAYS set password (fixes demo login after restart)
+            user.set_password(password)
+            user.first_name = first_name
+            user.last_name = last_name
+            user.is_active = True
+            if role == 'admin':
+                user.is_staff = True
+                user.is_superuser = True
+            user.save()
+
+            # Ensure only one profile per IIN
+            if iin_bin:
+                UserProfile.objects.filter(iin_bin=iin_bin).exclude(user=user).delete()
+
             UserProfile.objects.update_or_create(
                 user=user,
                 defaults={
@@ -356,7 +366,7 @@ class Command(BaseCommand):
                     },
                 )
 
-        self.stdout.write(f'Created {len(demo_users)} demo users (5 farmers, 2 specialists, 2 commission, 2 heads, 1 admin, 1 auditor)')
+        self.stdout.write(f'Created {len(demo_users)} demo users (6 farmers + 5 staff, all password=demo123)')
 
         # Ensure demo EmulatedEntities exist for login page IINs
         from apps.emulator.models import EmulatedEntity
