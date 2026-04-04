@@ -1,0 +1,223 @@
+{
+  "timestamp": "2026-04-04T23:40:00Z",
+  "scenarios": [
+    {
+      "id": "S7.1",
+      "name": "Доступ без авторизации",
+      "status": "passed",
+      "steps": [
+        "/dashboard/ без логина → https://subsidyai.109-235-119-92.sslip.io/auth/login/?next=/dashboard/ (редирект: True)",
+        "/applications/new/ без логина → https://subsidyai.109-235-119-92.sslip.io/auth/login/?next=/applications/new/ (редирект: True)"
+      ],
+      "error": null
+    },
+    {
+      "id": "S7.2",
+      "name": "Неправильный логин",
+      "status": "passed",
+      "steps": [
+        "После неверного пароля: https://subsidyai.109-235-119-92.sslip.io/auth/login/ (на логине: True)",
+        "Сообщение об ошибке: True"
+      ],
+      "error": null
+    },
+    {
+      "id": "S7.3",
+      "name": "Ролевой доступ",
+      "status": "skipped",
+      "steps": [
+        "Не удалось залогиниться"
+      ],
+      "error": null
+    },
+    {
+      "id": "S1.1",
+      "name": "Подача заявки (голова)",
+      "status": "failed",
+      "steps": [
+        "Логин farmer1: FAIL"
+      ],
+      "error": "Не удалось залогиниться"
+    },
+    {
+      "id": "S2.1",
+      "name": "Dashboard специалиста",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/dashboard/, dashboard: True",
+        "Панель специалиста: True",
+        "Виджетов: 9"
+      ],
+      "error": null
+    },
+    {
+      "id": "S2.2",
+      "name": "Скоринг рейтинг",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/scoring/",
+        "Строк в таблице: 201",
+        "Заголовки: ['Ранг', 'Балл', 'Рекомендация', 'Заявитель', 'ИИН/БИН', 'Направление', 'Сумма', 'Накопительно']",
+        "Деталь: https://subsidyai.109-235-119-92.sslip.io/applications/"
+      ],
+      "error": null
+    },
+    {
+      "id": "S2.3",
+      "name": "Детальная заявка (скоринг)",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/applications/",
+        "Hard Filters: False",
+        "Скоринг: True",
+        "ML балл: False, Rule балл: False",
+        "Рекомендация: True",
+        "Прогресс-баров: 0"
+      ],
+      "error": null
+    },
+    {
+      "id": "S2.4",
+      "name": "Решение по заявке",
+      "status": "failed",
+      "steps": [
+        "Кнопка 'Одобрить': False",
+        "Кнопка 'Отклонить': видна",
+        "Кнопки решения не найдены"
+      ],
+      "error": "Нет кнопок одобрить/отклонить"
+    },
+    {
+      "id": "S2.5",
+      "name": "Аналитика",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/analytics/",
+        "Контент: True"
+      ],
+      "error": null
+    },
+    {
+      "id": "S2.6",
+      "name": "Эмулятор",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/emulator/",
+        "Элементов: 1"
+      ],
+      "error": null
+    },
+    {
+      "id": "S3.1",
+      "name": "Dashboard комиссии",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/dashboard/",
+        "Commission URL: https://subsidyai.109-235-119-92.sslip.io/commission/",
+        "Заявок: 101"
+      ],
+      "error": null
+    },
+    {
+      "id": "S3.3",
+      "name": "Массовое решение",
+      "status": "failed",
+      "steps": [
+        "Ошибка: Page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at https://subsidyai.109-235-119-92.sslip.io/commission/batch/\nCall log:\n  - navigating to \"https://sub"
+      ],
+      "error": "Page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at https://subsidyai.109-235-119-92.sslip.io/commission/batch/\nCall log:\n  - navigating to \"https://subsidyai.109-235-119-92.sslip.io/commission/batch/\","
+    },
+    {
+      "id": "S4.1",
+      "name": "Dashboard руководителя",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/dashboard/",
+        "Scoring URL: https://subsidyai.109-235-119-92.sslip.io/scoring/, доступ: True"
+      ],
+      "error": null
+    },
+    {
+      "id": "S5.1",
+      "name": "Аудит-лог",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/audit-log/",
+        "Записей: 51",
+        "Содержит действия: True"
+      ],
+      "error": null
+    },
+    {
+      "id": "S5.2",
+      "name": "Model info",
+      "status": "failed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/model-info/",
+        "ML модель инфо: False"
+      ],
+      "error": null
+    },
+    {
+      "id": "S6.1",
+      "name": "Уведомления",
+      "status": "failed",
+      "steps": [
+        "Логин не удался"
+      ],
+      "error": "https://subsidyai.109-235-119-92.sslip.io/auth/login/"
+    },
+    {
+      "id": "S8.1",
+      "name": "PDF экспорт",
+      "status": "failed",
+      "steps": [
+        "Заявка: https://subsidyai.109-235-119-92.sslip.io/applications/",
+        "Кнопка PDF не найдена"
+      ],
+      "error": "Нет кнопки PDF"
+    },
+    {
+      "id": "S9.1",
+      "name": "API entity-data",
+      "status": "skipped",
+      "steps": [
+        "Логин не удался"
+      ],
+      "error": null
+    }
+  ],
+  "bugs_found": [
+    {
+      "severity": "critical",
+      "scenario": "S1.1",
+      "step": 1,
+      "description": "Логин farmer1 не работает",
+      "expected": "Редирект на /dashboard/",
+      "actual": "URL: https://subsidyai.109-235-119-92.sslip.io/auth/login/"
+    },
+    {
+      "severity": "medium",
+      "scenario": "S3.3",
+      "step": 4,
+      "description": "/commission/batch/ вызывает ошибку: Page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at https://subsidyai.109-235-119-92.sslip.io/commissi",
+      "expected": "200 OK",
+      "actual": "Page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at https://subsidyai.109-235-119-92.sslip.io/commissi"
+    },
+    {
+      "severity": "medium",
+      "scenario": "S8.1",
+      "step": 3,
+      "description": "Кнопка PDF отсутствует на странице заявки",
+      "expected": "Кнопка 'PDF'",
+      "actual": "Не найдена"
+    }
+  ],
+  "summary": {
+    "total": 18,
+    "passed": 10,
+    "failed": 6,
+    "skipped": 2,
+    "bugs": 3
+  }
+}
