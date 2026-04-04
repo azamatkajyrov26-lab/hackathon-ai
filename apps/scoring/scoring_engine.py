@@ -207,16 +207,14 @@ class ScoringEngine:
             # --- Шаг 6.1: Проверка бюджета ---
             budget_available = self._check_budget(application)
 
-            # Обновляем статус заявки с учётом бюджета
-            if recommendation == 'approve':
-                if budget_available:
-                    application.status = 'approved'
-                else:
-                    application.status = 'waiting_list'
-            elif recommendation == 'reject':
+            # ИИ-скоринг НЕ меняет статус заявки — только даёт рекомендацию.
+            # Статус проходит через: submitted → checking (специалист) → approved/rejected (комиссия)
+            # Единственное исключение: hard filter rejection (критический отказ)
+            if recommendation == 'reject' and total_score < 20:
+                # Автоматический отказ только при критически низком балле (жёсткие фильтры)
                 application.status = 'rejected'
-            else:
-                application.status = 'checking'
+            elif application.status == 'draft':
+                application.status = 'submitted'
             application.save(update_fields=['status', 'updated_at'])
 
             # --- Шаг 6.2: Уведомление заявителю ---
