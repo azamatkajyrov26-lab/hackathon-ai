@@ -816,6 +816,36 @@ def application_detail(request, pk):
                     'detail': '',
                     'action': 'Нельзя подать две заявки на один вид субсидии в одном году.',
                 },
+                {
+                    'name': 'Падёж скота в пределах нормы',
+                    'passed': hard_filters.mortality_within_norm,
+                    'icon': 'fa-heartbeat',
+                    'color': 'rose',
+                    'system': 'Пр��каз №3-3/1061',
+                    'description': 'Проверяем, что процент падежа скота не превышает установленные нормы естественной убыли.',
+                    'detail': '',
+                    'action': 'Улучшите условия содержания животных. Обратитесь к ветеринарной службе.',
+                },
+                {
+                    'name': 'Нагрузка на пастбища в норме',
+                    'passed': hard_filters.pasture_load_valid,
+                    'icon': 'fa-leaf',
+                    'color': 'green',
+                    'system': 'Приказ №3-3/332',
+                    'description': 'Проверяем, что поголовье не превышает допустимую нагрузку на имеющиеся пастбища.',
+                    'detail': '',
+                    'action': 'Увеличьте площадь пастбищ или уменьшите поголовье до допустимой нормы.',
+                },
+                {
+                    'name': 'Племенное свидетельство',
+                    'passed': hard_filters.pedigree_valid,
+                    'icon': 'fa-certificate',
+                    'color': 'amber',
+                    'system': 'Приказ №108',
+                    'description': 'Для племенных субсидий (формы 1-8) все животные должны иметь племенное свидетельство.',
+                    'detail': '',
+                    'action': 'Получите племенное свидетельство на животных в аттестованной племенной организации.',
+                },
             ])
 
     # External data from emulator
@@ -1501,8 +1531,22 @@ def farmer_dashboard(request):
     else:
         hf_failed.append('Нет подтверждённых ЭСФ')
 
+    # --- Regulatory checks (Приказы №3-3/1061, №3-3/332) ---
+    mortality_data = iszh.get('mortality_data', {})
+    total_mort_pct = mortality_data.get('total_mortality_pct', 0)
+    if mortality_data and total_mort_pct <= 3.0:
+        hf_passed += 1
+    elif mortality_data:
+        hf_failed.append(f'Падёж {total_mort_pct:.1f}% выше нормы (Приказ №3-3/1061)')
+
+    pasture_area = egkn.get('pasture_area', 0)
+    if pasture_area > 0:
+        hf_passed += 1
+    else:
+        hf_failed.append('Нет данных о пастбищах (Приказ №3-3/332)')
+
     hard_filter_summary = {
-        'total': 15,
+        'total': 18,
         'passed': hf_passed,
         'checkable': hf_passed + len(hf_failed),
         'failed_reasons': hf_failed,
@@ -1531,6 +1575,9 @@ def farmer_dashboard(request):
         'pre_score': pre_score,
         'my_applications': my_apps,
         'hard_filter_summary': hard_filter_summary,
+        'mortality_data': mortality_data,
+        'pasture_area': egkn.get('pasture_area', 0),
+        'pasture_zone': egkn.get('pasture_zone', ''),
     }
     return render(request, 'scoring/farmer_dashboard.html', context)
 
@@ -1762,8 +1809,22 @@ def farmer_analytics(request):
     else:
         hf_failed.append('Нет подтверждённых ЭСФ')
 
+    # --- Regulatory checks (Приказы №3-3/1061, №3-3/332) ---
+    mortality_data = iszh.get('mortality_data', {})
+    total_mort_pct = mortality_data.get('total_mortality_pct', 0)
+    if mortality_data and total_mort_pct <= 3.0:
+        hf_passed += 1
+    elif mortality_data:
+        hf_failed.append(f'Падёж {total_mort_pct:.1f}% выше нормы (Приказ №3-3/1061)')
+
+    pasture_area = egkn.get('pasture_area', 0)
+    if pasture_area > 0:
+        hf_passed += 1
+    else:
+        hf_failed.append('Нет данных о пастбищах (Приказ №3-3/332)')
+
     hard_filter_summary = {
-        'total': 15,
+        'total': 18,
         'passed': hf_passed,
         'checkable': hf_passed + len(hf_failed),
         'failed_reasons': hf_failed,
@@ -2791,6 +2852,12 @@ def export_application_pdf(request, pk):
              hard_filters.min_herd_size_met),
             ('\u041d\u0435\u0442 \u0434\u0443\u0431\u043b\u0438\u043a\u0430\u0442\u043e\u0432',
              hard_filters.no_duplicate_application),
+            ('Падёж в норме (Приказ №3-3/1061)',
+             hard_filters.mortality_within_norm),
+            ('Нагрузка на пастбища (Приказ №3-3/332)',
+             hard_filters.pasture_load_valid),
+            ('Племенное свидетельство (Приказ №108)',
+             hard_filters.pedigree_valid),
         ]
 
         hf_table_data = [['\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430', '\u0420\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442']]

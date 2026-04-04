@@ -405,13 +405,51 @@ class Command(BaseCommand):
                 'rfid_scan_count_30d': rfid_scan_count,
             })
 
+            # Племенное свидетельство (для племенных субсидий, Приказ №108)
+            has_pedigree = random.random() > (0.3 if risk in ('clean', 'minor_issues') else 0.6)
+            animals[-1]['pedigree_certificate'] = has_pedigree
+
         rejected = sum(1 for a in animals if not a['age_valid'] or a['previously_subsidized'])
+
+        # --- Данные о падеже (Приказ №3-3/1061) ---
+        mortality_records = []
+        animal_types_in_herd = set(a['type'] for a in animals)
+        for atype in animal_types_in_herd:
+            type_count = sum(1 for a in animals if a['type'] == atype)
+            if risk == 'clean':
+                mort_pct = round(random.uniform(0.0, 1.5), 2)
+            elif risk == 'minor_issues':
+                mort_pct = round(random.uniform(0.5, 2.5), 2)
+            elif risk == 'risky':
+                mort_pct = round(random.uniform(1.0, 4.0), 2)
+            else:  # fraudulent
+                mort_pct = round(random.uniform(2.0, 8.0), 2)
+            fallen = max(0, int(type_count * mort_pct / 100))
+            mortality_records.append({
+                'animal_type': atype,
+                'category': 'adult',
+                'total_count': type_count,
+                'fallen_count': fallen,
+                'mortality_pct': mort_pct,
+                'period': '2025',
+            })
+
+        total_mort_pct = round(
+            sum(r['fallen_count'] for r in mortality_records) / max(count, 1) * 100, 2
+        )
+        mortality_data = {
+            'records': mortality_records,
+            'total_mortality_pct': total_mort_pct,
+            'reporting_year': 2025,
+        }
+
         return {
             'verified': True,
             'animals': animals,
             'total_verified': count - rejected,
             'total_rejected': rejected,
             'rejection_reasons': [],
+            'mortality_data': mortality_data,
         }
 
     def _gen_is_esf(self, risk, iin_bin):
@@ -470,10 +508,19 @@ class Command(BaseCommand):
                 'geometry': geometry,
             })
 
+        # Площадь пастбищ и зона (Приказ №3-3/332)
+        pasture_area = round(sum(
+            p['area_hectares'] for p in plots
+            if p.get('sub_purpose') in ('пастбище', 'сенокос')
+        ), 1)
+        pasture_zone = random.choice(['restored', 'degraded']) if risk != 'fraudulent' else 'degraded'
+
         return {
             'has_agricultural_land': True,
             'plots': plots,
             'total_agricultural_area': round(sum(p['area_hectares'] for p in plots), 1),
+            'pasture_area': pasture_area,
+            'pasture_zone': pasture_zone,
         }
 
     def _gen_treasury(self, risk):

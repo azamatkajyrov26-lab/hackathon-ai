@@ -8,13 +8,92 @@ from apps.scoring.models import Application, HardFilterResult
 logger = logging.getLogger(__name__)
 
 
+
+
+# ------------------------------------------------------------------
+# Нормы естественной убыли (падежа) — Приказ №3-3/1061 от 26.12.2018
+# Ключ: (вид, категория) -> максимальный % падежа
+# ------------------------------------------------------------------
+MORTALITY_NORMS = {
+    # КРС мясного направления
+    ('cattle', 'calves'): 2.0,          # телята
+    ('cattle', 'young'): 2.0,           # молодняк
+    ('cattle', 'maternal'): 2.0,        # маточное поголовье
+    ('cattle', 'import_air'): 2.5,      # импорт авиа
+    ('cattle', 'import_auto'): 5.0,     # импорт авто/жд
+    # КРС молочного направления
+    ('cattle_dairy', 'calves_20d'): 3.5, # телята до 20 дней
+    ('cattle_dairy', 'maternal'): 3.0,   # маточное
+    # Овцы
+    ('sheep', 'adult'): 3.0,            # взрослые
+    ('sheep', 'lambs'): 5.0,            # ягнята
+    # Лошади (табунное)
+    ('horse', 'foals'): 2.3,            # жеребята
+    ('horse', 'adult'): 2.0,            # взрослые
+    # Верблюды
+    ('camel', 'adult'): 2.0,
+    ('camel', 'calves'): 3.0,
+}
+
+# Значение по умолчанию если категория не найдена
+DEFAULT_MORTALITY_NORM = 3.0
+
+# ------------------------------------------------------------------
+# Предельно допустимые нормы нагрузки на пастбища — Приказ №3-3/332
+# Ключ: (регион_ключевое_слово, зона) -> га/голова КРС
+# Для овец: / 5, для лошадей: * 1.5, для верблюдов: * 2
+# ------------------------------------------------------------------
+PASTURE_LOAD_NORMS = {
+    # (регион, зона: 'restored' | 'degraded') -> га/голова КРС
+    ('Акмолинская', 'restored'): 5.0,
+    ('Акмолинская', 'degraded'): 8.0,
+    ('Костанайская', 'restored'): 5.5,
+    ('Костанайская', 'degraded'): 8.5,
+    ('Павлодарская', 'restored'): 6.0,
+    ('Павлодарская', 'degraded'): 10.0,
+    ('Карагандинская', 'restored'): 7.0,
+    ('Карагандинская', 'degraded'): 12.0,
+    ('Туркестанская', 'restored'): 8.0,
+    ('Туркестанская', 'degraded'): 14.0,
+    ('Алматинская', 'restored'): 5.0,
+    ('Алматинская', 'degraded'): 9.0,
+    ('Жамбылская', 'restored'): 7.0,
+    ('Жамбылская', 'degraded'): 12.0,
+    ('Кызылординская', 'restored'): 10.0,
+    ('Кызылординская', 'degraded'): 18.0,
+    ('Атырауская', 'restored'): 12.0,
+    ('Атырауская', 'degraded'): 20.0,
+    ('Мангистауская', 'restored'): 14.0,
+    ('Мангистауская', 'degraded'): 22.0,
+    ('Западно-Казахстанская', 'restored'): 6.0,
+    ('Западно-Казахстанская', 'degraded'): 10.0,
+    ('Актюбинская', 'restored'): 7.0,
+    ('Актюбинская', 'degraded'): 12.0,
+    ('Северо-Казахстанская', 'restored'): 4.5,
+    ('Северо-Казахстанская', 'degraded'): 7.0,
+    ('Восточно-Казахстанская', 'restored'): 5.0,
+    ('Восточно-Казахстанская', 'degraded'): 8.0,
+    ('Абай', 'restored'): 6.0,
+    ('Абай', 'degraded'): 10.0,
+    ('Жетісу', 'restored'): 5.5,
+    ('Жетісу', 'degraded'): 9.0,
+    ('Ұлытау', 'restored'): 8.0,
+    ('Ұлытау', 'degraded'): 14.0,
+}
+
+DEFAULT_PASTURE_NORM = 7.0  # га/голова КРС по умолчанию
+
+
 class HardFilterChecker:
     """
-    Проверяет 15 бинарных hard-фильтров для заявки.
+    Проверяет 18 бинарных hard-фильтров для заявки.
     Если хотя бы один FAIL — информирование заявителя (не отказ).
 
     Фильтры 1–11: базовые проверки регистрации и данных.
     Фильтры 12–15: дополнительные проверки по Приказу №108.
+    Фильтр 16: Нормы падежа (Приказ №3-3/1061).
+    Фильтр 17: Нагрузка на пастбища (Приказ №3-3/332).
+    Фильтр 18: Племенное свидетельство (Приказ №108 расширенный).
 
     Для хакатона данные читаются напрямую из EmulatedEntity JSON-полей
     вместо реальных HTTP-вызовов к API эмуляторов.
@@ -36,6 +115,9 @@ class HardFilterChecker:
         'subsidy_amount_valid': 'Сумма субсидии не превышает 50% стоимости',
         'min_herd_size_met': 'Минимальное поголовье соответствует требованиям',
         'no_duplicate_application': 'Нет дублирующих заявок в текущем году',
+        'mortality_within_norm': 'Падёж скота в пределах нормы (Приказ №3-3/1061)',
+        'pasture_load_valid': 'Нагрузка на пастбища в пределах нормы (Приказ №3-3/332)',
+        'pedigree_valid': 'Племенное свидетельство для племенных субсидий (Приказ №108)',
     }
 
     def __init__(self, application: Application):
@@ -304,9 +386,122 @@ class HardFilterChecker:
         )
         return not duplicate_exists
 
+    # ------------------------------------------------------------------
+    # Фильтры 16–18 (нормативные документы)
+    # ------------------------------------------------------------------
+
+    def _check_mortality_within_norm(self):
+        """Фильтр 16: Падёж скота в пределах нормы (Приказ №3-3/1061).
+
+        Проверяет mortality_data из ИС ИСЖ — фактический % падежа
+        не должен превышать нормативный по виду и категории животных.
+        """
+        if not self.entity:
+            return True  # Нет данных — пропускаем
+        is_iszh = self.entity.is_iszh_data or {}
+        mortality_data = is_iszh.get('mortality_data', {})
+        if not mortality_data:
+            return True  # Нет данных о падеже — пропускаем
+
+        # Проверяем каждую категорию
+        records = mortality_data.get('records', [])
+        for rec in records:
+            animal_type = rec.get('animal_type', '')
+            category = rec.get('category', 'adult')
+            actual_pct = rec.get('mortality_pct', 0)
+
+            # Маппинг direction -> тип для поиска нормы
+            norm_key = (animal_type, category)
+            max_pct = MORTALITY_NORMS.get(norm_key, DEFAULT_MORTALITY_NORM)
+
+            if actual_pct > max_pct:
+                return False
+
+        # Также проверяем общий % если указан
+        total_pct = mortality_data.get('total_mortality_pct', 0)
+        if total_pct > DEFAULT_MORTALITY_NORM:
+            return False
+
+        return True
+
+    def _check_pasture_load_valid(self):
+        """Фильтр 17: Нагрузка на пастбища в пределах нормы (Приказ №3-3/332).
+
+        Вычисляет: (поголовье в пересчёте на КРС) / (площадь пастбищ)
+        и сравнивает с региональной нормой.
+        """
+        if not self.entity:
+            return True
+
+        egkn = self.entity.egkn_data or {}
+        is_iszh = self.entity.is_iszh_data or {}
+
+        # Площадь пастбищ (га)
+        pasture_area = egkn.get('pasture_area', 0)
+        if pasture_area <= 0:
+            # Считаем из plots
+            plots = egkn.get('plots', [])
+            pasture_area = sum(
+                p.get('area_hectares', 0)
+                for p in plots
+                if p.get('sub_purpose', '') in ('пастбище', 'сенокос')
+            )
+        if pasture_area <= 0:
+            return True  # Нет данных о пастбищах — пропускаем
+
+        # Поголовье в пересчёте на условные головы КРС
+        animals = is_iszh.get('animals', [])
+        cattle_equiv = 0
+        for a in animals:
+            atype = a.get('type', '')
+            if atype == 'cattle':
+                cattle_equiv += 1.0
+            elif atype == 'sheep':
+                cattle_equiv += 0.2  # 5 овец = 1 КРС
+            elif atype == 'horse':
+                cattle_equiv += 1.5
+            elif atype == 'camel':
+                cattle_equiv += 2.0
+
+        if cattle_equiv <= 0:
+            return True
+
+        # Определяем региональную норму
+        region = self.application.region
+        zone = egkn.get('pasture_zone', 'restored')
+        norm = DEFAULT_PASTURE_NORM
+        for (reg_key, z), val in PASTURE_LOAD_NORMS.items():
+            if reg_key in region and z == zone:
+                norm = val
+                break
+
+        # Нагрузка: сколько га нужно на текущее поголовье
+        required_area = cattle_equiv * norm
+        return pasture_area >= required_area
+
+    def _check_pedigree_valid(self):
+        """Фильтр 18: Племенное свидетельство для племенных субсидий (Приказ №108).
+
+        Для субсидий форм 1-8 (племенные) все выбранные животные
+        должны иметь pedigree_certificate == True.
+        """
+        subsidy_type = self.application.subsidy_type
+        form_number = subsidy_type.form_number
+
+        # Только для племенных субсидий (формы 1-8)
+        if form_number not in self.TRIBAL_FORM_NUMBERS:
+            return True
+
+        animals = self._get_selected_animals()
+        if not animals:
+            return True  # Нет выбранных животных — пропускаем
+
+        # Все животные должны иметь племенное свидетельство
+        return all(a.get('pedigree_certificate', False) for a in animals)
+
     def check_all(self) -> dict:
         """
-        Запускает все 15 hard-фильтров.
+        Запускает все 18 hard-фильтров.
         Возвращает словарь с результатами и сохраняет HardFilterResult.
         """
         self._load_entity()
@@ -327,6 +522,9 @@ class HardFilterChecker:
             'subsidy_amount_valid': self._check_subsidy_amount_valid,
             'min_herd_size_met': self._check_min_herd_size_met,
             'no_duplicate_application': self._check_no_duplicate_application,
+            'mortality_within_norm': self._check_mortality_within_norm,
+            'pasture_load_valid': self._check_pasture_load_valid,
+            'pedigree_valid': self._check_pedigree_valid,
         }
 
         self.failed_reasons = []
@@ -361,6 +559,9 @@ class HardFilterChecker:
                 'subsidy_amount_valid': self.results.get('subsidy_amount_valid', False),
                 'min_herd_size_met': self.results.get('min_herd_size_met', False),
                 'no_duplicate_application': self.results.get('no_duplicate_application', False),
+                'mortality_within_norm': self.results.get('mortality_within_norm', False),
+                'pasture_load_valid': self.results.get('pasture_load_valid', False),
+                'pedigree_valid': self.results.get('pedigree_valid', False),
                 'all_passed': all_passed,
                 'failed_reasons': self.failed_reasons,
                 'raw_responses': self.raw_responses,

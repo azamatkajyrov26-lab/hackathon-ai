@@ -204,6 +204,50 @@
                 </div>
             </div>
 
+            <!-- Regulatory indicators -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Pasture load (Приказ №3-3/332) -->
+                <div class="card-glass p-4">
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2"><i class="fas fa-leaf mr-1"></i> Нагрузка на пастбища</h4>
+                    {% if pasture_area > 0 %}
+                    <p class="text-xl font-bold text-gray-800">{{ pasture_area|floatformat:1 }} га</p>
+                    <p class="text-xs text-gray-500">Площадь пастбищ{% if pasture_zone %} ({{ pasture_zone }}){% endif %}</p>
+                    {% if animal_summary.total > 0 %}
+                    <p class="text-xs mt-1 text-gray-600">≈ {{ pasture_area|floatformat:0 }} га / {{ animal_summary.total }} голов</p>
+                    {% endif %}
+                    <span class="inline-block mt-2 badge-success text-[10px] px-2 py-0.5 rounded-md"><i class="fas fa-check mr-0.5"></i>Приказ №3-3/332</span>
+                    {% else %}
+                    <p class="text-sm text-gray-400">Нет данных</p>
+                    <span class="inline-block mt-2 badge-warning text-[10px] px-2 py-0.5 rounded-md"><i class="fas fa-triangle-exclamation mr-0.5"></i>Нет данных о пастбищах</span>
+                    {% endif %}
+                </div>
+                <!-- Mortality norm (Приказ №3-3/1061) -->
+                <div class="card-glass p-4">
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2"><i class="fas fa-heartbeat mr-1"></i> Падёж скота</h4>
+                    {% if mortality_data.records %}
+                    <p class="text-xl font-bold {% if mortality_data.total_mortality_pct <= 2.0 %}text-green-600{% elif mortality_data.total_mortality_pct <= 3.0 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                        {{ mortality_data.total_mortality_pct|floatformat:1 }}%
+                    </p>
+                    <p class="text-xs text-gray-500">Общий % падежа за {{ mortality_data.reporting_year|default:"2025" }} г.</p>
+                    <div class="mt-2 space-y-1">
+                        {% for rec in mortality_data.records %}
+                        <div class="flex justify-between text-xs text-gray-600">
+                            <span>{{ rec.animal_type }}: {{ rec.fallen_count }} из {{ rec.total_count }}</span>
+                            <span class="{% if rec.mortality_pct <= 2.0 %}text-green-600{% elif rec.mortality_pct <= 3.0 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ rec.mortality_pct }}%</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% if mortality_data.total_mortality_pct <= 3.0 %}
+                    <span class="inline-block mt-2 badge-success text-[10px] px-2 py-0.5 rounded-md"><i class="fas fa-check mr-0.5"></i>В пределах нормы</span>
+                    {% else %}
+                    <span class="inline-block mt-2 badge-error text-[10px] px-2 py-0.5 rounded-md"><i class="fas fa-xmark mr-0.5"></i>Превышение нормы</span>
+                    {% endif %}
+                    {% else %}
+                    <p class="text-sm text-gray-400">Нет данных</p>
+                    {% endif %}
+                </div>
+            </div>
+
             <!-- Список участков -->
             {% if plots %}
             <div class="card-glass p-4">

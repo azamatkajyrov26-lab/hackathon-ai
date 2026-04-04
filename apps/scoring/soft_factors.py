@@ -282,7 +282,11 @@ class SoftFactorCalculator:
         }
 
     def _calc_farm_size(self) -> dict:
-        """Factor 3: Размер хозяйства (max 15, weight 0.15)."""
+        """Factor 3: Размер хозяйства + нагрузка на пастбища (max 15, weight 0.15).
+
+        Включает бонус/штраф за соблюдение норм нагрузки на пастбища
+        (Приказ №3-3/332).
+        """
         land_area = self.egkn_data.get('total_agricultural_area', 0)
         herd_size = self.is_iszh_data.get('total_verified', 0)
 
@@ -308,6 +312,38 @@ class SoftFactorCalculator:
 
         score = min(15.0, max(0.0, land_score + herd_score))
 
+        # --- Бонус/штраф за нагрузку на пастбища (Приказ №3-3/332) ---
+        pasture_area = self.egkn_data.get('pasture_area', 0)
+        pasture_note = ''
+        pasture_bonus = 0.0
+        if pasture_area > 0 and herd_size > 0:
+            # Пересчёт в условные головы КРС
+            animals = self.is_iszh_data.get('animals', [])
+            cattle_equiv = 0
+            for a in animals:
+                atype = a.get('type', '')
+                if atype == 'cattle':
+                    cattle_equiv += 1.0
+                elif atype == 'sheep':
+                    cattle_equiv += 0.2
+                elif atype == 'horse':
+                    cattle_equiv += 1.5
+                elif atype == 'camel':
+                    cattle_equiv += 2.0
+            if cattle_equiv > 0:
+                load_ratio = pasture_area / cattle_equiv  # га/условную голову
+                if load_ratio >= 7.0:
+                    pasture_bonus = 1.5
+                    pasture_note = f'. Пастбища: {pasture_area:.0f} га, {load_ratio:.1f} га/гол — отлично (+1.5 б.)'
+                elif load_ratio >= 4.0:
+                    pasture_bonus = 0.5
+                    pasture_note = f'. Пастбища: {pasture_area:.0f} га, {load_ratio:.1f} га/гол — норма (+0.5 б.)'
+                else:
+                    pasture_bonus = -1.0
+                    pasture_note = f'. Пастбища: {pasture_area:.0f} га, {load_ratio:.1f} га/гол — перегрузка (-1.0 б.)'
+
+        score = min(15.0, max(0.0, score + pasture_bonus))
+
         # Определяем размер
         if score >= 12:
             size_label = 'крупное хозяйство'
@@ -320,6 +356,7 @@ class SoftFactorCalculator:
 
         explanation = (
             f'{land_area:.1f} га с/х земли, {herd_size} голов — {size_label}'
+            f'{pasture_note}'
         )
 
         weight = 0.15
@@ -331,12 +368,14 @@ class SoftFactorCalculator:
             'weight': weight,
             'weighted_value': round(score * weight, 2),
             'explanation': explanation,
-            'data_source': 'egkn',
+            'data_source': 'egkn + is_iszh' if pasture_note else 'egkn',
             'raw_data': {
                 'land_area': land_area,
                 'herd_size': herd_size,
                 'land_score': round(land_score, 2),
                 'herd_score': round(herd_score, 2),
+                'pasture_area': pasture_area,
+                'pasture_bonus': pasture_bonus,
             },
         }
 
@@ -417,11 +456,34 @@ class SoftFactorCalculator:
             co_note = f'. Рост продукции (+{co_bonus:.0f} б.)'
 
         score = score + co_bonus - co_penalty
+
+        # --- Бонус/штраф за нормы падежа (Приказ №3-3/1061) ---
+        mortality_data = self.is_iszh_data.get('mortality_data', {})
+        mortality_bonus = 0.0
+        mortality_note = ''
+        total_mort_pct = mortality_data.get('total_mortality_pct', 0)
+        if mortality_data and mortality_data.get('records'):
+            if total_mort_pct <= 1.0:
+                mortality_bonus = 2.0
+                mortality_note = f'. Падёж {total_mort_pct:.1f}% — отлично (+2 б., Приказ №3-3/1061)'
+            elif total_mort_pct <= 2.0:
+                mortality_bonus = 1.0
+                mortality_note = f'. Падёж {total_mort_pct:.1f}% — в норме (+1 б.)'
+            elif total_mort_pct <= 3.0:
+                mortality_bonus = 0.0
+                mortality_note = f'. Падёж {total_mort_pct:.1f}% — пограничный'
+            else:
+                mortality_bonus = -2.0
+                mortality_note = f'. Падёж {total_mort_pct:.1f}% — выше нормы (-2 б.)'
+
+        score = score + mortality_bonus
         score = min(15.0, max(0.0, score))
 
         data_source = 'ias_rszh'
         if co_bonus > 0 or co_penalty > 0:
             data_source += ' + giss'
+        if mortality_note:
+            data_source += ' + is_iszh'
 
         if retention_rate is None:
             explanation = 'Нет истории субсидирования поголовья — нейтральная оценка'
@@ -430,7 +492,7 @@ class SoftFactorCalculator:
                 f'Сохранность {retention_rate:.0%} — {returns} возвратов '
                 f'из {total_heads_subsidized} просубсидированных голов'
             )
-        explanation += co_note
+        explanation += co_note + mortality_note
 
         weight = 0.15
         return {
@@ -453,6 +515,8 @@ class SoftFactorCalculator:
                 'repeat_violation': repeat_violation,
                 'gross_production_previous_year': prev_year,
                 'gross_production_year_before': year_before,
+                'mortality_pct': total_mort_pct,
+                'mortality_bonus': mortality_bonus,
             },
         }
 
