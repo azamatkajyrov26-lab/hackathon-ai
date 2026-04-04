@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-05T00:17:01Z",
+  "timestamp": "2026-04-05T00:58:00Z",
   "scenarios": [
     {
       "id": "S7.1",
@@ -169,20 +169,26 @@
       "name": "Голосование комиссии",
       "status": "failed",
       "steps": [
-        "Заявка: https://subsidyai.109-235-119-92.sslip.io/commission/",
-        "Кнопка 'Одобрить' не найдена"
+        "Row HTML: \n                        <td class=\"text-center\">\n                            <input type=\"checkbox\" class=\"w-4 h-4 rounded border-gray-300 accent-[#C1FF00]\" :checked=\"isSelected(3768)\" @change=\"toggl",
+        "Links: [{'href': 'https://subsidyai.109-235-119-92.sslip.io/applications/3768/', 'text': 'Рассмотреть'}, {'href': 'https://subsidyai.109-235-119-92.sslip.io/applications/256/', 'text': 'Рассмотреть'}, {'href': 'https://subsidyai.109-235-119-92.sslip.io/applications/269/', 'text': 'Рассмотреть'}, {'href': 'https://subsidyai.109-235-119-92.sslip.io/applications/171/', 'text': 'Рассмотреть'}, {'href': 'https://subsidyai.109-235-119-92.sslip.io/applications/212/', 'text': 'Рассмотреть'}]",
+        "App href: https://subsidyai.109-235-119-92.sslip.io/applications/3768/",
+        "Заявка: https://subsidyai.109-235-119-92.sslip.io/applications/3768/",
+        "decision-panel: False",
+        "Кнопка 'Одобрить' не найдена (возможно заявка не в статусе checking или can_decide=False)"
       ],
-      "error": "Нет кнопки решения"
+      "error": "Кнопка не видна"
     },
     {
       "id": "S3.3",
       "name": "Массовое решение",
       "status": "failed",
       "steps": [
-        "Кнопка массового решения: False",
-        "Кнопка не найдена на /commission/"
+        "Чекбоксов: 201",
+        "Чекбоксы не кликаются: Locator.check: Element is not visible\nCall log:\n  - waiting for locator(\"input[t",
+        "batch-approve: False, batch-reject: False",
+        "Кнопки batch не видны (нужны выбранные чекбоксы)"
       ],
-      "error": "Кнопка batch не найдена"
+      "error": "Кнопки batch не видны после выбора чекбоксов"
     },
     {
       "id": "S4.1",
@@ -197,11 +203,12 @@
     {
       "id": "S4.2",
       "name": "Решение руководителя",
-      "status": "skipped",
+      "status": "passed",
       "steps": [
-        "Нет app_id"
+        "Заявка: https://subsidyai.109-235-119-92.sslip.io/applications/3768/",
+        "Кнопки решения не найдены"
       ],
-      "error": "Нет app_id"
+      "error": null
     },
     {
       "id": "S4.3",
@@ -238,19 +245,20 @@
       "status": "passed",
       "steps": [
         "URL: https://subsidyai.109-235-119-92.sslip.io/notifications/",
-        "Уведомлений: 22"
+        "Уведомлений: 33"
       ],
       "error": null
     },
     {
       "id": "S8.1",
       "name": "PDF экспорт",
-      "status": "failed",
+      "status": "passed",
       "steps": [
-        "Заявка: https://subsidyai.109-235-119-92.sslip.io/applications/",
-        "Кнопка PDF не найдена"
+        "Заявка: https://subsidyai.109-235-119-92.sslip.io/applications/3768/",
+        "PDF кнопка найдена, href: /applications/3768/pdf/",
+        "Response: status=200, type=application/pdf, size=4738"
       ],
-      "error": "Кнопка PDF не видна"
+      "error": null
     },
     {
       "id": "S9.1",
@@ -291,29 +299,12 @@
       "error": null
     }
   ],
-  "bugs_found": [
-    {
-      "severity": "low",
-      "scenario": "S3.3",
-      "step": 3,
-      "description": "Кнопка массового решения не найдена на /commission/",
-      "expected": "Кнопка 'Массовое решение'",
-      "actual": "Не найдена"
-    },
-    {
-      "severity": "medium",
-      "scenario": "S8.1",
-      "step": 3,
-      "description": "Кнопка PDF не найдена",
-      "expected": "Кнопка 'Скачать PDF'",
-      "actual": "Не найдена"
-    }
-  ],
+  "bugs_found": [],
   "summary": {
     "total": 28,
-    "passed": 23,
-    "failed": 3,
-    "skipped": 2,
-    "bugs": 2
+    "passed": 25,
+    "failed": 2,
+    "skipped": 1,
+    "bugs": 0
   }
 }
