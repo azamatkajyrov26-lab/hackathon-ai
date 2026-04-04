@@ -38,6 +38,51 @@ BREEDS_CATTLE = ['Ангусская', 'Герефордская', 'Казахс
 BREEDS_SHEEP = ['Эдильбаевская', 'Казахская тонкорунная', 'Каракульская', 'Меринос', 'Гиссарская']
 BREEDS_HORSE = ['Казахская', 'Кустанайская', 'Мугалжарская', 'Донская']
 
+# Центры регионов для генерации полигонов земельных участков
+REGION_CENTERS = {
+    'Акмолинская область': (51.15, 69.40),
+    'Алматинская область': (43.35, 77.00),
+    'Костанайская область': (53.20, 63.60),
+    'Туркестанская область': (42.30, 68.25),
+    'Карагандинская область': (49.80, 73.10),
+    'область Абай': (50.42, 80.23),
+    'Павлодарская область': (52.30, 76.95),
+    'Северо-Казахстанская область': (54.87, 69.15),
+    'Восточно-Казахстанская область': (49.95, 82.60),
+    'Актюбинская область': (50.30, 57.20),
+    'Западно-Казахстанская область': (51.35, 51.36),
+    'Жамбылская область': (42.90, 71.40),
+    'Атырауская область': (47.10, 51.92),
+    'Кызылординская область': (44.85, 65.50),
+    'Мангистауская область': (43.35, 52.06),
+    'область Жетісу': (44.85, 79.00),
+    'область Ұлытау': (48.00, 67.50),
+}
+
+
+def _generate_plot_polygon(center_lat, center_lon, area_ha, idx=0):
+    """Генерирует прямоугольный полигон GeoJSON для земельного участка."""
+    import math
+    # Смещение для каждого участка, чтобы не накладывались
+    offset_lat = (idx * 0.015) + random.uniform(-0.01, 0.01)
+    offset_lon = (idx * 0.015) + random.uniform(-0.01, 0.01)
+    clat = center_lat + offset_lat
+    clon = center_lon + offset_lon
+    # Примерный размер в градусах (1° ≈ 111 км)
+    side_m = math.sqrt(area_ha * 10000)  # сторона квадрата в метрах
+    dlat = side_m / 111000 / 2
+    dlon = side_m / (111000 * math.cos(math.radians(clat))) / 2
+    # Небольшое искажение для реалистичности
+    skew = random.uniform(-0.0005, 0.0005)
+    coords = [
+        [round(clon - dlon, 6), round(clat - dlat, 6)],
+        [round(clon + dlon + skew, 6), round(clat - dlat + skew, 6)],
+        [round(clon + dlon, 6), round(clat + dlat, 6)],
+        [round(clon - dlon - skew, 6), round(clat + dlat - skew, 6)],
+        [round(clon - dlon, 6), round(clat - dlat, 6)],  # замыкание
+    ]
+    return {'type': 'Polygon', 'coordinates': [coords]}
+
 FARM_PREFIXES_LEGAL = ['ТОО', 'КХ', 'ТОО']
 FARM_NAMES = [
     'Агрофирма', 'Байтерек', 'Дала', 'Жулдыз', 'Нур', 'Степь', 'Асыл', 'Тулпар',
@@ -288,18 +333,69 @@ class Command(BaseCommand):
                 rfid_scan_count = 0
                 rfid_last_scan = None
 
+            sex = random.choice(['female', 'male'])
+            prev_sub = risk == 'fraudulent' and random.random() > 0.5
+
+            # Продуктивность: кг мяса / литры молока
+            if animal_type == 'cattle':
+                meat_kg = round(random.uniform(180, 350), 1) if sex == 'male' else round(random.uniform(150, 250), 1)
+                milk_liters = round(random.uniform(3000, 8000), 0) if sex == 'female' else 0
+            elif animal_type == 'sheep':
+                meat_kg = round(random.uniform(15, 45), 1)
+                milk_liters = round(random.uniform(50, 200), 0) if sex == 'female' else 0
+            elif animal_type == 'horse':
+                meat_kg = round(random.uniform(150, 280), 1)
+                milk_liters = round(random.uniform(1000, 3000), 0) if sex == 'female' else 0
+            else:
+                meat_kg = 0
+                milk_liters = 0
+
+            # Продавец (откуда купили животное)
+            seller_names = [
+                'ТОО "АгроСнаб Казахстан"', 'КХ "Племхоз"', 'ТОО "Алтын Бас"',
+                'ИП Нурланов А.К.', 'ТОО "Казплем"', 'КХ "Жайлау"',
+                'ТОО "Астана-Агро"', 'ИП Серикбаев Б.Т.', 'ТОО "СарыАрка Агро"',
+            ]
+            seller = {
+                'name': random.choice(seller_names),
+                'iin_bin': f'{random.randint(100000000000, 999999999999)}',
+                'purchase_date': (date.today() - timedelta(days=random.randint(30, 730))).isoformat(),
+                'purchase_price': random.randint(150000, 800000),
+            }
+
+            # Детали предыдущих субсидий (если ранее субсидировалось)
+            subsidy_details = []
+            if prev_sub:
+                sub_year = random.randint(2022, 2025)
+                sub_types = [
+                    'Приобретение маточного поголовья КРС',
+                    'Ведение селекционной работы',
+                    'Удешевление стоимости реализованной говядины',
+                    'Приобретение племенного быка-производителя',
+                ]
+                subsidy_details.append({
+                    'year': sub_year,
+                    'type': random.choice(sub_types),
+                    'amount': random.randint(100000, 400000),
+                    'status': 'выплачено',
+                })
+
             animals.append({
                 'tag_number': f'KZ{random.randint(10000000, 99999999)}',
                 'type': animal_type,
                 'breed': breed,
                 'category': random.choice(['heifer', 'bull', 'ewe', 'ram']),
-                'sex': random.choice(['female', 'male']),
+                'sex': sex,
                 'birth_date': (date.today() - timedelta(days=age * 30)).isoformat(),
                 'age_months': age,
                 'age_valid': age_valid if risk != 'fraudulent' else random.random() > 0.4,
                 'owner_iin_bin': iin_bin,
                 'owner_match': True,
-                'previously_subsidized': risk == 'fraudulent' and random.random() > 0.5,
+                'previously_subsidized': prev_sub,
+                'subsidy_details': subsidy_details,
+                'meat_kg': meat_kg,
+                'milk_liters': milk_liters,
+                'seller': seller,
                 'vet_status': 'healthy' if risk != 'risky' else random.choice(['healthy', 'quarantine']),
                 'last_vet_check': (date.today() - timedelta(days=random.randint(1, 90))).isoformat(),
                 'registration_date': (date.today() - timedelta(days=random.randint(30, 365))).isoformat(),
@@ -358,8 +454,10 @@ class Command(BaseCommand):
 
         plot_count = random.randint(1, 3)
         plots = []
-        for _ in range(plot_count):
+        center = REGION_CENTERS.get(region, (48.0, 68.0))
+        for i in range(plot_count):
             area = round(random.uniform(5, 500), 1)
+            geometry = _generate_plot_polygon(center[0], center[1], area, idx=i)
             plots.append({
                 'cadastral_number': f'{random.randint(1,99):02d}-{random.randint(100,999)}-{random.randint(100,999)}-{random.randint(100,999)}',
                 'area_hectares': area,
@@ -369,6 +467,7 @@ class Command(BaseCommand):
                 'district': district,
                 'ownership_type': random.choice(['собственность', 'аренда']),
                 'registration_date': f'{random.randint(2010, 2023)}-{random.randint(1,12):02d}-{random.randint(1,28):02d}',
+                'geometry': geometry,
             })
 
         return {

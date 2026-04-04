@@ -475,6 +475,18 @@ def application_create(request):
                 pre_errors.append('Нет ЭЦП (ЕАСУ)')
             if not pre_ias.get('registered', False) and entity_type != 'cooperative':
                 pre_errors.append('Нет регистрации в ИАС РСЖ')
+            # Проверка дублирующей заявки — нельзя подать на тот же тип субсидии в текущем году
+            from django.utils import timezone as tz
+            dup_exists = Application.objects.filter(
+                applicant__iin_bin=iin_bin,
+                subsidy_type=stype,
+                created_at__year=tz.now().year,
+            ).exclude(status='rejected').exists()
+            if dup_exists:
+                pre_errors.append(
+                    f'У вас уже есть заявка на "{stype.name}" в {tz.now().year} году. '
+                    f'Повторная подача не допускается (Приказ №108 МСХ РК).'
+                )
             # Проверяем выбранных животных на ранее субсидированных
             for a in selected_animals:
                 if a.get('previously_subsidized', False):
@@ -2488,6 +2500,29 @@ def _int(val, default=0):
 
 
 # === Form Progress (Redis cache) ===
+
+@login_required
+def api_check_duplicate(request):
+    """Проверяет, есть ли уже заявка на данный тип субсидии в текущем году."""
+    iin_bin = request.GET.get('iin_bin', '')
+    stype_id = request.GET.get('subsidy_type', '')
+    if not iin_bin or not stype_id:
+        return JsonResponse({'duplicate': False})
+    from django.utils import timezone as tz
+    dup = Application.objects.filter(
+        applicant__iin_bin=iin_bin,
+        subsidy_type_id=stype_id,
+        created_at__year=tz.now().year,
+    ).exclude(status='rejected').first()
+    if dup:
+        return JsonResponse({
+            'duplicate': True,
+            'message': f'У вас уже есть заявка №{dup.number} на этот вид субсидии ({dup.get_status_display()}). Повторная подача не допускается.',
+            'app_number': dup.number,
+            'app_status': dup.status,
+        })
+    return JsonResponse({'duplicate': False})
+
 
 @login_required
 @require_http_methods(['GET', 'POST', 'DELETE'])

@@ -132,6 +132,9 @@
                         <div class="text-xs text-gray-500 space-y-1">
                             <div class="flex justify-between"><span>Порода</span><span class="text-gray-700 font-medium">{{ animal.breed }}</span></div>
                             <div class="flex justify-between"><span>Возраст</span><span class="text-gray-700 font-medium">{{ animal.age_months }} мес.</span></div>
+                            {% if animal.meat_kg %}<div class="flex justify-between"><span>Мясо</span><span class="text-gray-700 font-medium">{{ animal.meat_kg }} кг</span></div>{% endif %}
+                            {% if animal.milk_liters %}<div class="flex justify-between"><span>Молоко</span><span class="text-gray-700 font-medium">{{ animal.milk_liters|floatformat:0 }} л/год</span></div>{% endif %}
+                            {% if animal.seller %}<div class="flex justify-between"><span>Продавец</span><span class="text-gray-700 font-medium truncate ml-2" title="{{ animal.seller.name }}">{{ animal.seller.name }}</span></div>{% endif %}
                         </div>
                         <div class="flex flex-wrap gap-1 mt-2">
                             {% if animal.vet_status == 'healthy' or animal.vet_status == 'clear' %}
@@ -151,7 +154,7 @@
                             {% endif %}
 
                             {% if animal.previously_subsidized %}
-                            <span class="badge-warning text-[10px] px-2 py-0.5 rounded-md"><i class="fas fa-triangle-exclamation mr-0.5"></i>Ранее субсидировано</span>
+                            <span class="badge-warning text-[10px] px-2 py-0.5 rounded-md" title="{% for sd in animal.subsidy_details %}{{ sd.year }}: {{ sd.type }} — {{ sd.amount }} тг ({{ sd.status }}){% if not forloop.last %}; {% endif %}{% endfor %}"><i class="fas fa-triangle-exclamation mr-0.5"></i>Ранее субсидировано{% if animal.subsidy_details %}: {% for sd in animal.subsidy_details %}{{ sd.year }} {{ sd.type|truncatechars:30 }}{% endfor %}{% endif %}</span>
                             {% endif %}
 
                             {% if not animal.owner_match %}
@@ -200,6 +203,27 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Список участков -->
+            {% if plots %}
+            <div class="card-glass p-4">
+                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3"><i class="fas fa-list mr-1"></i> Участки ({{ plots|length }})</h4>
+                <div class="space-y-2">
+                    {% for plot in plots %}
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <div>
+                            <span class="font-mono text-sm font-bold text-gray-800">{{ plot.cadastral_number }}</span>
+                            <span class="text-xs text-gray-500 ml-2">{{ plot.sub_purpose|default:"с/х" }}</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-lg font-bold text-gray-900">{{ plot.area_hectares }} га</span>
+                            <span class="text-[10px] block text-gray-400">{{ plot.ownership_type|default:"" }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Map -->
             <div class="card-glass overflow-hidden" x-data="{ saving: false, saved: false }">

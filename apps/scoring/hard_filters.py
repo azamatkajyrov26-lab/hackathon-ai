@@ -235,19 +235,19 @@ class HardFilterChecker:
             return True
 
         # Оценочная стоимость = количество * цена за единицу
-        unit_price = self.application.unit_price or Decimal('0')
+        unit_price = Decimal(str(self.application.unit_price or 0))
         quantity = self.application.quantity or 0
 
         if unit_price <= 0 or quantity <= 0:
             return True  # Нет данных о стоимости — пропускаем
 
         estimated_cost = unit_price * quantity
-        total_amount = self.application.total_amount or Decimal('0')
+        total_amount = Decimal(str(self.application.total_amount or 0))
 
         # Субсидия не должна превышать 50% от реальной стоимости
         # Если unit_price ≈ rate (данные из эмулятора), считаем что реальная
         # стоимость выше норматива — пропускаем проверку
-        rate = self.application.subsidy_type.rate or Decimal('0')
+        rate = Decimal(str(self.application.subsidy_type.rate or 0))
         if rate > 0 and abs(unit_price - rate) / rate < Decimal('0.1'):
             return True  # unit_price ≈ rate, нет данных о реальной стоимости
 

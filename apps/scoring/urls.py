@@ -27,6 +27,7 @@ urlpatterns = [
     path('rfid-dashboard/', views.rfid_dashboard, name='rfid_dashboard'),
     path('model-info/', views.model_info_view, name='model_info'),
     path('api/form-progress/', views.api_form_progress, name='api_form_progress'),
+    path('api/check-duplicate/', views.api_check_duplicate, name='api_check_duplicate'),
     path('my-farm/', views.farmer_dashboard, name='farmer_dashboard'),
     path('my-analytics/', views.farmer_analytics, name='farmer_analytics'),
     path('audit-log/', views.audit_log_view, name='audit_log'),
