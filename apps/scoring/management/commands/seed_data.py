@@ -4,6 +4,7 @@ Covers ALL agricultural subsidy directions in Kazakhstan (not just livestock).
 """
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
+from django.utils import timezone
 from apps.scoring.models import SubsidyDirection, SubsidyType, Budget, UserProfile, ApplicationPeriod
 
 
@@ -293,13 +294,14 @@ class Command(BaseCommand):
         self.stdout.write(f'Created budgets for {len(REGIONS)} regions x {SubsidyDirection.objects.count()} directions')
 
         # Demo users — ALL 6 roles including farmers
+        # Farmers linked to demo IINs shown on login page
         demo_users = [
-            # Фермеры / Заявители
-            ('farmer1', 'demo123', 'Касымов', 'Ерлан', 'applicant', 'Акмолинская область', 'ТОО "Агрофирма Степь"'),
-            ('farmer2', 'demo123', 'Жумабаев', 'Нурсултан', 'applicant', 'Костанайская область', 'КХ "Жумабаев"'),
-            ('farmer3', 'demo123', 'Ахметова', 'Айгуль', 'applicant', 'Алматинская область', 'ИП Ахметова А.'),
-            ('farmer4', 'demo123', 'Тулебаев', 'Марат', 'applicant', 'Туркестанская область', 'СПК "Береке"'),
-            ('farmer5', 'demo123', 'Сатпаев', 'Дархан', 'applicant', 'Павлодарская область', 'ТОО "Нур Дала"'),
+            # Фермеры / Заявители (iin_bin привязан к EmulatedEntity)
+            ('farmer1', 'demo123', 'Касымов', 'Ерлан', 'applicant', 'Акмолинская область', 'ТОО "Агрофирма Степь"', '880720300456'),
+            ('farmer2', 'demo123', 'Жумабаев', 'Нурсултан', 'applicant', 'Костанайская область', 'КХ "Жумабаев"', '901105200789'),
+            ('farmer3', 'demo123', 'Ахметова', 'Айгуль', 'applicant', 'Алматинская область', 'ИП Ахметова А.', '950315400123'),
+            ('farmer4', 'demo123', 'Тулебаев', 'Марат', 'applicant', 'Туркестанская область', 'СПК "Береке"', '850930100234'),
+            ('farmer5', 'demo123', 'Сатпаев', 'Дархан', 'applicant', 'Павлодарская область', 'ТОО "Нур Дала"', '920812500567'),
             # Специалисты МИО
             ('specialist', 'demo123', 'Сериков', 'Алмас', 'mio_specialist', 'Акмолинская область', 'Управление с/х Акмолинской области'),
             ('specialist2', 'demo123', 'Муратова', 'Жанна', 'mio_specialist', 'Костанайская область', 'Управление с/х Костанайской области'),
@@ -317,6 +319,7 @@ class Command(BaseCommand):
         for row in demo_users:
             username, password, last_name, first_name, role, region = row[:6]
             organization = row[6] if len(row) > 6 else ''
+            iin_bin = row[7] if len(row) > 7 else ''
             user, created_user = User.objects.get_or_create(
                 username=username,
                 defaults={
@@ -335,7 +338,59 @@ class Command(BaseCommand):
                     'role': role,
                     'region': region,
                     'organization': organization,
+                    'iin_bin': iin_bin,
                 },
             )
+
+            # Создаём Applicant для фермеров
+            if role == 'applicant' and iin_bin:
+                from apps.scoring.models import Applicant
+                Applicant.objects.get_or_create(
+                    iin_bin=iin_bin,
+                    defaults={
+                        'name': organization or f'{last_name} {first_name}',
+                        'entity_type': 'cooperative' if 'СПК' in organization else ('legal' if 'ТОО' in organization or 'КХ' in organization else 'individual'),
+                        'region': region,
+                        'district': '',
+                        'registration_date': timezone.now().date(),
+                    },
+                )
+
         self.stdout.write(f'Created {len(demo_users)} demo users (5 farmers, 2 specialists, 2 commission, 2 heads, 1 admin, 1 auditor)')
+
+        # Ensure demo EmulatedEntities exist for login page IINs
+        from apps.emulator.models import EmulatedEntity
+        demo_entities = [
+            ('880720300456', 'СПК "Береке Астана"', 'cooperative', 'Акмолинская область', 'Целиноградский район', 'clean'),
+            ('901105200789', 'КХ "Жумабаев Н."', 'legal', 'Костанайская область', 'Костанайский район', 'clean'),
+            ('950315400123', 'ИП Абрамова С.', 'individual', 'Алматинская область', 'Алматинский район', 'fraudulent'),
+            ('850930100234', 'ТОО "Дала Агро"', 'legal', 'Туркестанская область', 'Сайрамский район', 'risky'),
+            ('920812500567', 'ИП Тастемирова А.', 'individual', 'Павлодарская область', 'Павлодарский район', 'minor_issues'),
+            ('870325100890', 'КХ "Оспанов"', 'legal', 'Карагандинская область', 'Бухар-Жырауский район', 'minor_issues'),
+        ]
+        for iin, name, etype, reg, dist, risk in demo_entities:
+            if not EmulatedEntity.objects.filter(iin_bin=iin).exists():
+                self.stdout.write(f'  Creating demo entity: {name} ({iin})')
+                # Import generate_data helpers
+                from apps.emulator.management.commands.generate_data import Command as GenCmd
+                gen = GenCmd()
+                from datetime import date as dt_date
+                reg_date = dt_date(2020, 1, 15)
+                EmulatedEntity.objects.create(
+                    iin_bin=iin,
+                    name=name,
+                    entity_type=etype,
+                    region=reg,
+                    district=dist,
+                    registration_date=reg_date,
+                    risk_profile=risk,
+                    giss_data=gen._gen_giss(risk),
+                    ias_rszh_data=gen._gen_ias_rszh(risk, reg_date, reg, dist, name, etype),
+                    easu_data=gen._gen_easu(etype, name),
+                    is_iszh_data=gen._gen_is_iszh(risk, iin),
+                    is_esf_data=gen._gen_is_esf(risk, iin),
+                    egkn_data=gen._gen_egkn(risk, reg, dist),
+                    treasury_data=gen._gen_treasury(risk),
+                )
+
         self.stdout.write(self.style.SUCCESS('Seed data complete!'))

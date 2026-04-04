@@ -2468,7 +2468,7 @@ def rfid_dashboard(request):
     return render(request, 'scoring/rfid_dashboard.html', context)
 
 
-@role_required('mio_specialist', 'mio_head', 'admin')
+@role_required('mio_specialist', 'mio_head', 'admin', 'auditor')
 def model_info_view(request):
     """Страница с информацией о ML модели."""
     from apps.scoring.ml_model import get_model_info
