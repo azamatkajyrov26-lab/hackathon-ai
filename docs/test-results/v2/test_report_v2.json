@@ -1,0 +1,319 @@
+{
+  "timestamp": "2026-04-05T00:17:01Z",
+  "scenarios": [
+    {
+      "id": "S7.1",
+      "name": "Доступ без авторизации",
+      "status": "passed",
+      "steps": [
+        "/dashboard/ → redirect: True",
+        "/applications/new/ → redirect: True"
+      ],
+      "error": null
+    },
+    {
+      "id": "S7.2",
+      "name": "Неправильный пароль",
+      "status": "passed",
+      "steps": [
+        "Неверный пароль → на логине: True"
+      ],
+      "error": null
+    },
+    {
+      "id": "S7.3",
+      "name": "Ролевой доступ",
+      "status": "passed",
+      "steps": [
+        "farmer → /commission/: blocked=True",
+        "farmer → /audit-log/: blocked=True"
+      ],
+      "error": null
+    },
+    {
+      "id": "S1.1",
+      "name": "Форма заявки (навигация)",
+      "status": "passed",
+      "steps": [
+        "Логин OK, URL: https://subsidyai.109-235-119-92.sslip.io/dashboard/",
+        "Dashboard: True",
+        "Текст содержит 'заявител': True",
+        "Форма URL: https://subsidyai.109-235-119-92.sslip.io/applications/new/",
+        "Шаг 1: ошибка Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"[cla",
+        "Шаг 2: Поле ИИН не найдено",
+        "Бейджи госсистем: 0",
+        "Шагов пройдено: 3",
+        "Животноводство: True",
+        "Кнопка 'Подать' не найдена — форма не пройдена до конца"
+      ],
+      "error": null
+    },
+    {
+      "id": "S1.6",
+      "name": "Моё хозяйство",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/my-farm/",
+        "Животные: True",
+        "Карточек: 26"
+      ],
+      "error": null
+    },
+    {
+      "id": "S1.7",
+      "name": "RFID Dashboard",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/rfid-dashboard/",
+        "RFID: True"
+      ],
+      "error": null
+    },
+    {
+      "id": "S1.8",
+      "name": "Аналитика фермера",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/my-analytics/",
+        "Контент: 2349 символов"
+      ],
+      "error": null
+    },
+    {
+      "id": "S1.9",
+      "name": "Список заявок",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/applications/",
+        "Строк: 12",
+        "Деталь: https://subsidyai.109-235-119-92.sslip.io/applications/"
+      ],
+      "error": null
+    },
+    {
+      "id": "S2.1",
+      "name": "Dashboard специалиста",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/dashboard/",
+        "Виджетов: 9"
+      ],
+      "error": null
+    },
+    {
+      "id": "S2.2",
+      "name": "Скоринг рейтинг",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/scoring/",
+        "Строк: 200",
+        "Заголовки: ['Ранг', 'Балл', 'Рекомендация', 'Заявитель', 'ИИН/БИН', 'Направление', 'Сумма', 'Накопительно']",
+        "Деталь: https://subsidyai.109-235-119-92.sslip.io/applications/"
+      ],
+      "error": null
+    },
+    {
+      "id": "S2.3",
+      "name": "Детальная заявка (скоринг + 18 фильтров)",
+      "status": "passed",
+      "steps": [
+        "Hard Filters: False, Scoring: True, ML: False",
+        "Фильтров найдено: 0",
+        "Новые фильтры: падёж=False, пастбища=False, племенное=False",
+        "Прогресс-баров: 0"
+      ],
+      "error": null
+    },
+    {
+      "id": "S2.4",
+      "name": "Решение (specialist — read-only)",
+      "status": "passed",
+      "steps": [
+        "Кнопка Одобрить: False",
+        "Кнопки решений не видны для specialist (по дизайну — только для commission/head)"
+      ],
+      "error": null
+    },
+    {
+      "id": "S2.5",
+      "name": "Аналитика",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/analytics/"
+      ],
+      "error": null
+    },
+    {
+      "id": "S2.6",
+      "name": "Эмулятор",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/emulator/",
+        "Сущностей: 0"
+      ],
+      "error": null
+    },
+    {
+      "id": "S3.1",
+      "name": "Dashboard комиссии",
+      "status": "passed",
+      "steps": [
+        "Dashboard: https://subsidyai.109-235-119-92.sslip.io/dashboard/",
+        "Commission: https://subsidyai.109-235-119-92.sslip.io/commission/",
+        "Заявок: 100"
+      ],
+      "error": null
+    },
+    {
+      "id": "S3.2",
+      "name": "Голосование комиссии",
+      "status": "failed",
+      "steps": [
+        "Заявка: https://subsidyai.109-235-119-92.sslip.io/commission/",
+        "Кнопка 'Одобрить' не найдена"
+      ],
+      "error": "Нет кнопки решения"
+    },
+    {
+      "id": "S3.3",
+      "name": "Массовое решение",
+      "status": "failed",
+      "steps": [
+        "Кнопка массового решения: False",
+        "Кнопка не найдена на /commission/"
+      ],
+      "error": "Кнопка batch не найдена"
+    },
+    {
+      "id": "S4.1",
+      "name": "Dashboard руководителя",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/dashboard/",
+        "Scoring: https://subsidyai.109-235-119-92.sslip.io/scoring/"
+      ],
+      "error": null
+    },
+    {
+      "id": "S4.2",
+      "name": "Решение руководителя",
+      "status": "skipped",
+      "steps": [
+        "Нет app_id"
+      ],
+      "error": "Нет app_id"
+    },
+    {
+      "id": "S4.3",
+      "name": "Выплата",
+      "status": "skipped",
+      "steps": [
+        "Кнопка не найдена (возможно заявка не в нужном статусе)"
+      ],
+      "error": "Кнопка не найдена (возможно заявка не в нужном статусе)"
+    },
+    {
+      "id": "S5.1",
+      "name": "Аудит-лог",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/audit-log/",
+        "Записей: 50"
+      ],
+      "error": null
+    },
+    {
+      "id": "S5.2",
+      "name": "Model info",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/model-info/",
+        "ML инфо: True, Запрещён: False"
+      ],
+      "error": null
+    },
+    {
+      "id": "S6.1",
+      "name": "Уведомления",
+      "status": "passed",
+      "steps": [
+        "URL: https://subsidyai.109-235-119-92.sslip.io/notifications/",
+        "Уведомлений: 22"
+      ],
+      "error": null
+    },
+    {
+      "id": "S8.1",
+      "name": "PDF экспорт",
+      "status": "failed",
+      "steps": [
+        "Заявка: https://subsidyai.109-235-119-92.sslip.io/applications/",
+        "Кнопка PDF не найдена"
+      ],
+      "error": "Кнопка PDF не видна"
+    },
+    {
+      "id": "S9.1",
+      "name": "API entity-data",
+      "status": "passed",
+      "steps": [
+        "Status: 200, Keys: ['found', 'entity_id', 'entity_name', 'entity_type', 'region', 'district', 'risk_label', 'systems_count', 'indicators', 'flat', 'animals', 'plots', 'invoices', 'accounts', 'spk_name', 'spk_members', 'rfid_summary', 'checks']",
+        "Missing keys: ['giss', 'ias_rszh', 'easu', 'is_iszh', 'egkn', 'is_esf', 'treasury']"
+      ],
+      "error": null
+    },
+    {
+      "id": "S9.2",
+      "name": "API rfid-status",
+      "status": "passed",
+      "steps": [
+        "Status: 200, Keys: ['found', 'entity_name', 'iin_bin', 'rfid_records', 'summary']"
+      ],
+      "error": null
+    },
+    {
+      "id": "S9.3",
+      "name": "API check-duplicate",
+      "status": "passed",
+      "steps": [
+        "Status: 200, Data: {'duplicate': False}",
+        "Field 'duplicate': True"
+      ],
+      "error": null
+    },
+    {
+      "id": "S9.4",
+      "name": "API form-progress",
+      "status": "passed",
+      "steps": [
+        "POST: 200, GET: 200"
+      ],
+      "error": null
+    }
+  ],
+  "bugs_found": [
+    {
+      "severity": "low",
+      "scenario": "S3.3",
+      "step": 3,
+      "description": "Кнопка массового решения не найдена на /commission/",
+      "expected": "Кнопка 'Массовое решение'",
+      "actual": "Не найдена"
+    },
+    {
+      "severity": "medium",
+      "scenario": "S8.1",
+      "step": 3,
+      "description": "Кнопка PDF не найдена",
+      "expected": "Кнопка 'Скачать PDF'",
+      "actual": "Не найдена"
+    }
+  ],
+  "summary": {
+    "total": 28,
+    "passed": 23,
+    "failed": 3,
+    "skipped": 2,
+    "bugs": 2
+  }
+}
