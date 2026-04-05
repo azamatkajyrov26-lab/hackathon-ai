@@ -867,6 +867,7 @@ def application_detail(request, pk):
     role = _get_role(request.user)
     can_decide = role in ('commission_member', 'mio_head', 'admin')
     can_pay = role in ('mio_specialist', 'mio_head', 'admin')
+    can_verify = role in ('mio_specialist', 'admin') and app.status == 'submitted'
 
     # Payment info
     payment = Payment.objects.filter(application=app).first()
@@ -1015,6 +1016,7 @@ def application_detail(request, pk):
         'shap_data': shap_data,
         'scoring_breakdown': scoring_breakdown,
         'user_role': role,
+        'can_verify': can_verify,
     })
 
 
@@ -1091,6 +1093,46 @@ def application_decide(request, pk):
             )
 
     messages.success(request, f'Решение "{dict(Decision.DECISION_CHOICES).get(decision_val)}" сохранено')
+    return redirect(f'/applications/{pk}/')
+
+
+@role_required('mio_specialist', 'admin')
+@require_http_methods(['POST'])
+def specialist_verify(request, pk):
+    """Специалист МИО проверил заявку → передать комиссии (status: submitted → checking)."""
+    app = get_object_or_404(Application, pk=pk)
+
+    if app.status != 'submitted':
+        messages.error(request, 'Заявка не в статусе "Подана" — невозможно передать на комиссию')
+        return redirect(f'/applications/{pk}/')
+
+    checklist_notes = request.POST.get('checklist_notes', '').strip()
+
+    app.status = 'checking'
+    app.save(update_fields=['status', 'updated_at'])
+
+    log_action(
+        user=request.user, action='verify',
+        entity_type='Application', entity_id=app.id,
+        description=f'Специалист проверил заявку {app.number} и передал на комиссию. {checklist_notes}',
+        request=request,
+        metadata={'application_number': app.number, 'notes': checklist_notes},
+    )
+
+    # Уведомление заявителю
+    target_profile = UserProfile.objects.filter(
+        iin_bin=app.applicant.iin_bin, role='applicant'
+    ).select_related('user').first()
+    if target_profile:
+        Notification.objects.create(
+            user=target_profile.user,
+            application=app,
+            notification_type='review',
+            title='Заявка передана на комиссию',
+            message=f'Специалист МИО проверил вашу заявку {app.number} и передал её на рассмотрение комиссии.',
+        )
+
+    messages.success(request, f'Заявка {app.number} проверена и передана на комиссию')
     return redirect(f'/applications/{pk}/')
 
 
@@ -1186,7 +1228,7 @@ def commission(request):
     scores = (
         Score.objects
         .select_related('application__applicant', 'application__subsidy_type__direction')
-        .filter(application__status__in=['approved', 'waiting_list', 'submitted', 'checking'])
+        .filter(application__status__in=['approved', 'waiting_list', 'checking'])
         .order_by('-total_score')
     )
 

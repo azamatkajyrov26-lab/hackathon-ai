@@ -10,6 +10,7 @@ urlpatterns = [
     path('applications/<int:pk>/success/', views.application_success, name='application_success'),
     path('scoring-methodology/', views.scoring_methodology, name='scoring_methodology'),
     path('applications/<int:pk>/decide/', views.application_decide, name='application_decide'),
+    path('applications/<int:pk>/verify/', views.specialist_verify, name='specialist_verify'),
     path('applications/<int:pk>/payment/', views.payment_action, name='payment_action'),
     path('applications/<int:pk>/pdf/', views.export_application_pdf, name='application_pdf'),
     path('scoring/', views.scoring_ranking, name='scoring_ranking'),
