@@ -1057,9 +1057,11 @@ def application_decide(request, pk):
     app.status = status_map.get(decision_val, app.status)
     app.save()
 
-    # Платёжный flow: при одобрении создаём платёж
+    # Платёжный flow: при одобрении создаём платёж с Merit Score
     if decision_val in ('approved', 'partially_approved'):
         import random
+        from apps.scoring.scoring_engine import calculate_merit_score
+        merit, merit_breakdown = calculate_merit_score(app)
         Payment.objects.get_or_create(
             application=app,
             defaults={
@@ -1067,6 +1069,8 @@ def application_decide(request, pk):
                 'status': 'initiated',
                 'treasury_ref': f'TR-{timezone.now().year}-{random.randint(100000, 999999)}',
                 'initiated_by': request.user,
+                'merit_score': merit,
+                'merit_breakdown': merit_breakdown,
             },
         )
 
@@ -2202,6 +2206,65 @@ def payment_action(request, pk):
             )
 
     return redirect(f'/applications/{pk}/')
+
+
+@role_required('mio_specialist', 'mio_head', 'admin')
+def payment_queue(request):
+    """Очередь выплат — ранжирование по Merit Score (не по дате)."""
+    payments = (
+        Payment.objects
+        .select_related('application__applicant', 'application__subsidy_type__direction')
+        .filter(status__in=['initiated', 'sent_to_treasury'])
+        .order_by('-merit_score')
+    )
+
+    # Пересчитать merit_score для платежей без него
+    from apps.scoring.scoring_engine import calculate_merit_score
+    for p in payments:
+        if p.merit_score == 0:
+            merit, breakdown = calculate_merit_score(p.application)
+            p.merit_score = merit
+            p.merit_breakdown = breakdown
+            p.save(update_fields=['merit_score', 'merit_breakdown'])
+
+    # Re-fetch after update
+    payments = (
+        Payment.objects
+        .select_related('application__applicant', 'application__subsidy_type__direction')
+        .filter(status__in=['initiated', 'sent_to_treasury'])
+        .order_by('-merit_score')
+    )
+
+    # Budget stats
+    total_queue = payments.aggregate(s=Sum('amount'))['s'] or 0
+    total_budget = float(Budget.objects.aggregate(s=Sum('planned_amount'))['s'] or 0)
+    total_spent = float(Budget.objects.aggregate(s=Sum('spent_amount'))['s'] or 0)
+    available = total_budget - total_spent
+
+    # Cumulative amounts for "cut-off line"
+    queue_data = []
+    cumulative = 0
+    for i, p in enumerate(payments, 1):
+        cumulative += float(p.amount)
+        queue_data.append({
+            'rank': i,
+            'payment': p,
+            'app': p.application,
+            'cumulative': cumulative,
+            'within_budget': cumulative <= available,
+        })
+
+    completed_count = Payment.objects.filter(status='completed').count()
+    completed_sum = Payment.objects.filter(status='completed').aggregate(s=Sum('amount'))['s'] or 0
+
+    return render(request, 'scoring/payment_queue.html', {
+        'queue_data': queue_data,
+        'total_queue': total_queue,
+        'total_budget': total_budget,
+        'available_budget': available,
+        'completed_count': completed_count,
+        'completed_sum': completed_sum,
+    })
 
 
 def logout_view(request):

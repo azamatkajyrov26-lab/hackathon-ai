@@ -374,9 +374,12 @@ class Payment(models.Model):
     amount = models.DecimalField('Сумма', max_digits=15, decimal_places=2)
     status = models.CharField('Статус', max_length=20, choices=STATUS_CHOICES, default='initiated')
     treasury_ref = models.CharField('Номер Казначейства', max_length=50, blank=True)
+    merit_score = models.DecimalField('Merit Score', max_digits=5, decimal_places=2, default=0,
+                                       help_text='Приоритет выплаты: 30% масштаб + 25% финансы + 25% история + 20% направление')
+    merit_breakdown = models.JSONField('Разбивка Merit Score', default=dict, blank=True)
     initiated_at = models.DateTimeField(auto_now_add=True)
     sent_at = models.DateTimeField('Отправлен', null=True, blank=True)
-    completed_at = models.DateTimeField('Выплачен', null=True, blank=True)
+    completed_at = models.DateTimeField('Выпла��ен', null=True, blank=True)
     initiated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:

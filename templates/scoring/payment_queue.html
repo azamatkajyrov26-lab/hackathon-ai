@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block page_title %}Очередь выплат{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+    .merit-ring { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .merit-ring .merit-num { font-size: 16px; font-weight: 800; line-height: 1; }
+    .cutoff-line { position: relative; }
+    .cutoff-line::after { content: 'Граница бюджета'; position: absolute; right: 0; top: -10px; font-size: 10px; color: #DC2626; font-weight: 700; background: #FEF2F2; padding: 2px 8px; border-radius: 4px; }
+    .merit-bar { height: 6px; border-radius: 3px; background: #F3F4F6; overflow: hidden; }
+    .merit-fill { height: 100%; border-radius: 3px; transition: width 0.6s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900"><i class="fas fa-coins mr-2 text-yellow-500"></i>Очередь выплат</h2>
+            <p class="text-sm text-gray-500 mt-1">Приоритизация по Merit Score — эффективность, а не очерёдность</p>
+        </div>
+        <a href="/commission/" class="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">
+            <i class="fas fa-arrow-left"></i> Комиссия
+        </a>
+    </div>
+
+    <!-- Formula explanation -->
+    <div class="card-glass p-5" style="background: linear-gradient(135deg, #FFFBEB, #FEF3C7); border-color: #FDE68A;">
+        <h3 class="text-xs font-bold text-yellow-800 uppercase tracking-wider mb-3"><i class="fas fa-calculator mr-1"></i> Формула Merit Score</h3>
+        <div class="flex flex-wrap gap-3 text-sm">
+            <div class="px-3 py-2 rounded-lg bg-white/80 border border-yellow-200 text-center">
+                <div class="text-[10px] text-gray-500 font-semibold">Масштаб хозяйства</div>
+                <div class="font-bold text-gray-800">30%</div>
+                <div class="text-[9px] text-gray-400">поголовье / площадь</div>
+            </div>
+            <span class="self-center text-gray-400 font-mono">+</span>
+            <div class="px-3 py-2 rounded-lg bg-white/80 border border-yellow-200 text-center">
+                <div class="text-[10px] text-gray-500 font-semibold">Финансовая эфф.</div>
+                <div class="font-bold text-gray-800">25%</div>
+                <div class="text-[9px] text-gray-400">налоги / выручка</div>
+            </div>
+            <span class="self-center text-gray-400 font-mono">+</span>
+            <div class="px-3 py-2 rounded-lg bg-white/80 border border-yellow-200 text-center">
+                <div class="text-[10px] text-gray-500 font-semibold">История субсидий</div>
+                <div class="font-bold text-gray-800">25%</div>
+                <div class="text-[9px] text-gray-400">надёжность фермера</div>
+            </div>
+            <span class="self-center text-gray-400 font-mono">+</span>
+            <div class="px-3 py-2 rounded-lg bg-white/80 border border-yellow-200 text-center">
+                <div class="text-[10px] text-gray-500 font-semibold">Приоритет направления</div>
+                <div class="font-bold text-gray-800">20%</div>
+                <div class="text-[9px] text-gray-400">политика МСХ</div>
+            </div>
+            <span class="self-center text-gray-400 font-mono">=</span>
+            <div class="px-3 py-2 rounded-lg bg-gray-900 text-center">
+                <div class="text-[10px] text-gray-400 font-semibold">Merit Score</div>
+                <div class="font-bold text-white">0-100</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div class="card-glass p-4 text-center">
+            <p class="text-2xl font-bold text-gray-800">{{ queue_data|length }}</p>
+            <p class="text-xs text-gray-500 mt-1">В очереди</p>
+        </div>
+        <div class="card-glass p-4 text-center">
+            <p class="text-2xl font-bold text-yellow-600">{{ total_queue|floatformat:0|intcomma }} ₸</p>
+            <p class="text-xs text-gray-500 mt-1">Сумма очереди</p>
+        </div>
+        <div class="card-glass p-4 text-center">
+            <p class="text-2xl font-bold {% if available_budget > 0 %}text-green-600{% else %}text-red-600{% endif %}">{{ available_budget|floatformat:0|intcomma }} ₸</p>
+            <p class="text-xs text-gray-500 mt-1">Доступный бюджет</p>
+        </div>
+        <div class="card-glass p-4 text-center">
+            <p class="text-2xl font-bold text-blue-600">{{ completed_count }}</p>
+            <p class="text-xs text-gray-500 mt-1">Уже выплачено ({{ completed_sum|floatformat:0|intcomma }} ₸)</p>
+        </div>
+    </div>
+
+    <!-- Budget bar -->
+    <div class="card-glass p-4">
+        <div class="flex justify-between text-xs text-gray-500 mb-2">
+            <span>Общий бюджет: {{ total_budget|floatformat:0|intcomma }} ₸</span>
+            <span>Доступно: {{ available_budget|floatformat:0|intcomma }} ₸</span>
+        </div>
+        <div class="h-3 rounded-full bg-gray-200 overflow-hidden">
+            {% if total_budget > 0 %}
+            <div class="h-full rounded-full bg-gradient-to-r from-green-400 to-lime-400" style="width: {% widthratio available_budget total_budget 100 %}%"></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Queue table -->
+    <div class="card-glass overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        <th class="px-4 py-3">#</th>
+                        <th class="px-4 py-3">Merit</th>
+                        <th class="px-4 py-3">Заявитель</th>
+                        <th class="px-4 py-3">Направление</th>
+                        <th class="px-4 py-3 text-right">Сумма</th>
+                        <th class="px-4 py-3 text-right">Накопительно</th>
+                        <th class="px-4 py-3">Статус</th>
+                        <th class="px-4 py-3">Разбивка Merit Score</th>
+                        <th class="px-4 py-3"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in queue_data %}
+                    <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors {% if not item.within_budget %}bg-red-50/50{% endif %}"
+                        {% if not item.within_budget and item.rank == queue_data|length or item.within_budget and not forloop.last and not queue_data|length %}{% endif %}>
+                        <td class="px-4 py-3 font-bold text-gray-400">{{ item.rank }}</td>
+                        <td class="px-4 py-3">
+                            <div class="merit-ring border-3 {% if item.payment.merit_score >= 70 %}border-green-400 bg-green-50{% elif item.payment.merit_score >= 40 %}border-yellow-400 bg-yellow-50{% else %}border-red-400 bg-red-50{% endif %}">
+                                <span class="merit-num {% if item.payment.merit_score >= 70 %}text-green-700{% elif item.payment.merit_score >= 40 %}text-yellow-700{% else %}text-red-700{% endif %}">{{ item.payment.merit_score|floatformat:0 }}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="font-semibold text-gray-800">{{ item.app.applicant.name }}</div>
+                            <div class="text-xs text-gray-400 font-mono">{{ item.app.number }}</div>
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="text-xs">{{ item.app.subsidy_type.direction.name }}</span>
+                            <div class="text-[10px] text-gray-400">{{ item.app.subsidy_type.name|truncatewords:5 }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-right font-mono font-semibold">{{ item.payment.amount|floatformat:0|intcomma }} ₸</td>
+                        <td class="px-4 py-3 text-right font-mono text-xs {% if item.within_budget %}text-green-600{% else %}text-red-600{% endif %}">
+                            {{ item.cumulative|floatformat:0|intcomma }} ₸
+                            {% if not item.within_budget %}<i class="fas fa-exclamation-triangle text-red-400 ml-1"></i>{% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            {% if item.payment.status == 'initiated' %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
+                                <i class="fas fa-clock text-[10px]"></i> Ожидает
+                            </span>
+                            {% elif item.payment.status == 'sent_to_treasury' %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                                <i class="fas fa-university text-[10px]"></i> В Казначействе
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            {% if item.payment.merit_breakdown %}
+                            <div class="space-y-1 min-w-[160px]">
+                                <div class="flex items-center gap-1">
+                                    <span class="text-[9px] text-gray-400 w-14">Масштаб</span>
+                                    <div class="merit-bar flex-1"><div class="merit-fill bg-blue-400" style="width: {{ item.payment.merit_breakdown.farm_scale }}%"></div></div>
+                                    <span class="text-[9px] font-mono text-gray-500 w-6 text-right">{{ item.payment.merit_breakdown.farm_scale|floatformat:0 }}</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span class="text-[9px] text-gray-400 w-14">Финансы</span>
+                                    <div class="merit-bar flex-1"><div class="merit-fill bg-green-400" style="width: {{ item.payment.merit_breakdown.financial }}%"></div></div>
+                                    <span class="text-[9px] font-mono text-gray-500 w-6 text-right">{{ item.payment.merit_breakdown.financial|floatformat:0 }}</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span class="text-[9px] text-gray-400 w-14">История</span>
+                                    <div class="merit-bar flex-1"><div class="merit-fill bg-purple-400" style="width: {{ item.payment.merit_breakdown.history }}%"></div></div>
+                                    <span class="text-[9px] font-mono text-gray-500 w-6 text-right">{{ item.payment.merit_breakdown.history|floatformat:0 }}</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span class="text-[9px] text-gray-400 w-14">Направл.</span>
+                                    <div class="merit-bar flex-1"><div class="merit-fill bg-yellow-400" style="width: {{ item.payment.merit_breakdown.direction_priority }}%"></div></div>
+                                    <span class="text-[9px] font-mono text-gray-500 w-6 text-right">{{ item.payment.merit_breakdown.direction_priority|floatformat:0 }}</span>
+                                </div>
+                            </div>
+                            {% else %}
+                            <span class="text-xs text-gray-400">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            <a href="/applications/{{ item.app.id }}/" class="text-gray-400 hover:text-gray-600 transition-colors">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% if item.within_budget and not forloop.last %}
+                    {% with next_idx=forloop.counter %}
+                    {% endwith %}
+                    {% endif %}
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="px-4 py-12 text-center text-gray-400">
+                            <i class="fas fa-check-circle text-3xl mb-2 block text-green-300"></i>
+                            Очередь выплат пуста — все платежи обработаны
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="card-glass p-4">
+        <div class="flex flex-wrap gap-4 text-xs text-gray-500">
+            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-green-400"></div> В пределах бюджета</div>
+            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-red-400"></div> Превышает доступный бюджет</div>
+            <div class="flex items-center gap-2"><i class="fas fa-sort-amount-down text-gray-400"></i> Сортировка по Merit Score (не по дате)</div>
+        </div>
+        <p class="text-[10px] text-gray-400 mt-2">
+            Merit Score определяет приоритет выплаты: крупные эффективные хозяйства с хорошей историей субсидий и приоритетным направлением получают выплату первыми.
+            Это заменяет старую систему FIFO (первый пришёл — первый получил).
+        </p>
+    </div>
+</div>
+{% endblock %}

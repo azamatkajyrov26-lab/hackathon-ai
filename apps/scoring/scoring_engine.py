@@ -681,3 +681,71 @@ class ScoringEngine:
                 title=f'Блокировка заявителя {applicant.name}',
                 message=reason,
             )
+
+
+def calculate_merit_score(application):
+    """
+    Рассчитывает Merit Score для приоритизации выплат.
+
+    Merit Score = 30% × масштаб хозяйства + 25% × финансовая эффективность
+                + 25% × история субсидий + 20% × приоритет направления
+
+    Данные берутся из уже рассчитанных ScoreFactor при скоринге заявки.
+    """
+    from apps.scoring.models import ScoreFactor, Score
+
+    breakdown = {
+        'farm_scale': 0,
+        'financial': 0,
+        'history': 0,
+        'direction_priority': 0,
+    }
+
+    try:
+        score = application.score
+    except Score.DoesNotExist:
+        return 0, breakdown
+
+    factors = {f.factor_code: f for f in ScoreFactor.objects.filter(score=score)}
+
+    # 1. Масштаб хозяйства (30%) — из factor "farm_size"
+    farm = factors.get('farm_size')
+    if farm:
+        breakdown['farm_scale'] = round(float(farm.value) / float(farm.max_value) * 100, 1)
+    else:
+        breakdown['farm_scale'] = 50  # нейтральный
+
+    # 2. Финансовая эффективность (25%) — из factor "financial_stability"
+    fin = factors.get('financial_stability')
+    if fin:
+        breakdown['financial'] = round(float(fin.value) / float(fin.max_value) * 100, 1)
+    else:
+        breakdown['financial'] = 50
+
+    # 3. История субсидий (25%) — из factor "subsidy_history"
+    hist = factors.get('subsidy_history')
+    if hist:
+        breakdown['history'] = round(float(hist.value) / float(hist.max_value) * 100, 1)
+    else:
+        breakdown['history'] = 50
+
+    # 4. Приоритет направления (20%) — по коду направления
+    direction_priorities = {
+        'breeding': 90,        # Племенное — высший приоритет
+        'feed_production': 80, # Кормопроизводство
+        'livestock': 75,       # Животноводство
+        'veterinary': 70,      # Ветеринария
+        'crop': 60,            # Растениеводство
+    }
+    direction_code = application.subsidy_type.direction.code if application.subsidy_type else ''
+    breakdown['direction_priority'] = direction_priorities.get(direction_code, 50)
+
+    # Итоговый Merit Score
+    merit = (
+        breakdown['farm_scale'] * 0.30
+        + breakdown['financial'] * 0.25
+        + breakdown['history'] * 0.25
+        + breakdown['direction_priority'] * 0.20
+    )
+
+    return round(merit, 2), breakdown
