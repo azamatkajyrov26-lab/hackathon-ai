@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 from functools import wraps
 
 from django.shortcuts import render, get_object_or_404, redirect
@@ -380,7 +381,9 @@ def application_list(request):
     if region:
         apps = apps.filter(region=region)
 
-    ordering = request.GET.get('ordering', '-submitted_at')
+    # Специалист МИО: по умолчанию сортировка по AI-скору (merit), а не по дате
+    default_ordering = '-score__total_score' if role == 'mio_specialist' else '-submitted_at'
+    ordering = request.GET.get('ordering', default_ordering)
     if ordering:
         apps = apps.order_by(ordering)
 
@@ -2204,6 +2207,56 @@ def payment_action(request, pk):
                 title=f'Выплата по заявке {app.number}',
                 message=f'На ваш счёт произведена выплата {app.total_amount} ₸ по заявке {app.number}.',
             )
+    elif action == 'partial_payment' and payment.status == 'initiated':
+        # Частичная выплата: если бюджета не хватает на полную сумму
+        try:
+            partial_amount = Decimal(request.POST.get('partial_amount', '0'))
+        except Exception:
+            partial_amount = Decimal('0')
+        if partial_amount <= 0 or partial_amount >= payment.amount:
+            messages.error(request, 'Некорректная сумма частичной выплаты')
+            return redirect(f'/applications/{pk}/')
+
+        remainder = payment.amount - partial_amount
+        # Текущий платёж — частичная выплата
+        payment.amount = partial_amount
+        payment.status = 'sent_to_treasury'
+        payment.sent_at = timezone.now()
+        payment.save()
+        # Остаток — новый платёж в лист ожидания
+        import random as _rnd
+        from apps.scoring.scoring_engine import calculate_merit_score
+        merit, merit_bd = calculate_merit_score(app)
+        Payment.objects.create(
+            application=app,
+            amount=remainder,
+            status='initiated',
+            treasury_ref=f'TR-{timezone.now().year}-{_rnd.randint(100000, 999999)}-R',
+            initiated_by=request.user,
+            merit_score=merit,
+            merit_breakdown=merit_bd,
+        )
+        app.status = 'partially_paid'
+        app.save()
+        log_action(
+            user=request.user, action='payment',
+            entity_type='Payment', entity_id=payment.id,
+            description=f'Частичная выплата {partial_amount} ₸ по заявке {app.number}. Остаток {remainder} ₸ в листе ожидания.',
+            request=request,
+            metadata={'partial': str(partial_amount), 'remainder': str(remainder)},
+        )
+        target_profile = UserProfile.objects.filter(
+            iin_bin=app.applicant.iin_bin, role='applicant'
+        ).select_related('user').first()
+        if target_profile:
+            Notification.objects.create(
+                user=target_profile.user,
+                application=app,
+                notification_type='info',
+                title=f'Частичная выплата по заявке {app.number}',
+                message=f'По вашей заявке {app.number} произведена частичная выплата {partial_amount} ₸. Остаток {remainder} ₸ поставлен в очередь на следующий период.',
+            )
+        messages.success(request, f'Частичная выплата {partial_amount} ₸. Остаток {remainder} ₸ в листе ожидания.')
 
     return redirect(f'/applications/{pk}/')
 
@@ -2211,7 +2264,7 @@ def payment_action(request, pk):
 @role_required('mio_specialist', 'mio_head', 'admin')
 def payment_queue(request):
     """Очередь выплат — ранжирование по Merit Score (не по дате)."""
-    payments = (
+    payments = list(
         Payment.objects
         .select_related('application__applicant', 'application__subsidy_type__direction')
         .filter(status__in=['initiated', 'sent_to_treasury'])
@@ -2220,50 +2273,96 @@ def payment_queue(request):
 
     # Пересчитать merit_score для платежей без него
     from apps.scoring.scoring_engine import calculate_merit_score
+    updated = False
     for p in payments:
         if p.merit_score == 0:
             merit, breakdown = calculate_merit_score(p.application)
             p.merit_score = merit
             p.merit_breakdown = breakdown
             p.save(update_fields=['merit_score', 'merit_breakdown'])
+            updated = True
 
-    # Re-fetch after update
-    payments = (
-        Payment.objects
-        .select_related('application__applicant', 'application__subsidy_type__direction')
-        .filter(status__in=['initiated', 'sent_to_treasury'])
-        .order_by('-merit_score')
-    )
+    if updated:
+        payments = list(
+            Payment.objects
+            .select_related('application__applicant', 'application__subsidy_type__direction')
+            .filter(status__in=['initiated', 'sent_to_treasury'])
+            .order_by('-merit_score')
+        )
 
-    # Budget stats
-    total_queue = payments.aggregate(s=Sum('amount'))['s'] or 0
-    total_budget = float(Budget.objects.aggregate(s=Sum('planned_amount'))['s'] or 0)
-    total_spent = float(Budget.objects.aggregate(s=Sum('spent_amount'))['s'] or 0)
+    # Budget stats — per region
+    budgets = Budget.objects.filter(year=timezone.now().year)
+    budget_by_region = {}
+    for b in budgets:
+        key = b.region
+        if key not in budget_by_region:
+            budget_by_region[key] = {'planned': 0, 'spent': 0, 'remaining': 0}
+        budget_by_region[key]['planned'] += float(b.planned_amount)
+        budget_by_region[key]['spent'] += float(b.spent_amount)
+        budget_by_region[key]['remaining'] += float(b.remaining_amount)
+
+    total_budget = sum(r['planned'] for r in budget_by_region.values())
+    total_spent = sum(r['spent'] for r in budget_by_region.values())
     available = total_budget - total_spent
 
-    # Cumulative amounts for "cut-off line"
+    # Cumulative amounts for "cut-off line" + partial payment detection
     queue_data = []
     cumulative = 0
     for i, p in enumerate(payments, 1):
-        cumulative += float(p.amount)
+        amt = float(p.amount)
+        cumulative += amt
+        within = cumulative <= available
+        # Частичная выплата: если эта заявка пересекает границу бюджета
+        partial_amount = 0
+        if not within and (cumulative - amt) < available:
+            partial_amount = round(available - (cumulative - amt), 2)
+
+        # Бюджет по региону заявки
+        region = p.application.region
+        region_budget = budget_by_region.get(region, {})
+
         queue_data.append({
             'rank': i,
             'payment': p,
             'app': p.application,
             'cumulative': cumulative,
-            'within_budget': cumulative <= available,
+            'within_budget': within,
+            'partial_amount': partial_amount,
+            'region_remaining': region_budget.get('remaining', 0),
         })
+
+    total_queue = sum(float(p.amount) for p in payments)
+    shortage = max(0, total_queue - available)
 
     completed_count = Payment.objects.filter(status='completed').count()
     completed_sum = Payment.objects.filter(status='completed').aggregate(s=Sum('amount'))['s'] or 0
+
+    # Регионы с дефицитом / профицитом бюджета
+    region_stats = []
+    for region, data in sorted(budget_by_region.items()):
+        queue_in_region = sum(
+            float(p.amount) for p in payments
+            if p.application.region == region
+        )
+        region_stats.append({
+            'name': region,
+            'planned': data['planned'],
+            'spent': data['spent'],
+            'remaining': data['remaining'],
+            'queue_amount': queue_in_region,
+            'deficit': max(0, queue_in_region - data['remaining']),
+            'surplus': max(0, data['remaining'] - queue_in_region),
+        })
 
     return render(request, 'scoring/payment_queue.html', {
         'queue_data': queue_data,
         'total_queue': total_queue,
         'total_budget': total_budget,
         'available_budget': available,
+        'shortage': shortage,
         'completed_count': completed_count,
         'completed_sum': completed_sum,
+        'region_stats': region_stats,
     })
 
 

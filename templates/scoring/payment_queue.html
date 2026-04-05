@@ -8,10 +8,9 @@
 <style>
     .merit-ring { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .merit-ring .merit-num { font-size: 16px; font-weight: 800; line-height: 1; }
-    .cutoff-line { position: relative; }
-    .cutoff-line::after { content: 'Граница бюджета'; position: absolute; right: 0; top: -10px; font-size: 10px; color: #DC2626; font-weight: 700; background: #FEF2F2; padding: 2px 8px; border-radius: 4px; }
     .merit-bar { height: 6px; border-radius: 3px; background: #F3F4F6; overflow: hidden; }
     .merit-fill { height: 100%; border-radius: 3px; transition: width 0.6s; }
+    .cutoff-row td { border-top: 3px dashed #EF4444 !important; }
 </style>
 {% endblock %}
 
@@ -64,7 +63,7 @@
     </div>
 
     <!-- Stats -->
-    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
         <div class="card-glass p-4 text-center">
             <p class="text-2xl font-bold text-gray-800">{{ queue_data|length }}</p>
             <p class="text-xs text-gray-500 mt-1">В очереди</p>
@@ -78,10 +77,39 @@
             <p class="text-xs text-gray-500 mt-1">Доступный бюджет</p>
         </div>
         <div class="card-glass p-4 text-center">
+            {% if shortage > 0 %}
+            <p class="text-2xl font-bold text-red-600">-{{ shortage|floatformat:0|intcomma }} ₸</p>
+            <p class="text-xs text-red-500 mt-1">Дефицит бюджета</p>
+            {% else %}
+            <p class="text-2xl font-bold text-green-600">0 ₸</p>
+            <p class="text-xs text-gray-500 mt-1">Без дефицита</p>
+            {% endif %}
+        </div>
+        <div class="card-glass p-4 text-center">
             <p class="text-2xl font-bold text-blue-600">{{ completed_count }}</p>
-            <p class="text-xs text-gray-500 mt-1">Уже выплачено ({{ completed_sum|floatformat:0|intcomma }} ₸)</p>
+            <p class="text-xs text-gray-500 mt-1">Выплачено ({{ completed_sum|floatformat:0|intcomma }} ₸)</p>
         </div>
     </div>
+
+    <!-- Budget shortage alert -->
+    {% if shortage > 0 %}
+    <div class="card-glass p-5 border-2 border-red-200" style="background: linear-gradient(135deg, #FEF2F2, #FFF1F2);">
+        <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-exclamation-triangle text-red-600"></i>
+            </div>
+            <div>
+                <h3 class="text-sm font-bold text-red-800">Нехватка бюджета: {{ shortage|floatformat:0|intcomma }} ₸</h3>
+                <p class="text-xs text-red-600 mt-1">Сумма очереди ({{ total_queue|floatformat:0|intcomma }} ₸) превышает доступный бюджет ({{ available_budget|floatformat:0|intcomma }} ₸).</p>
+                <div class="mt-3 space-y-1 text-xs text-red-700">
+                    <p><i class="fas fa-check-circle mr-1"></i> <strong>Вариант 1:</strong> Частичная выплата — оплатить часть суммы, остаток в лист ожидания на следующий период</p>
+                    <p><i class="fas fa-check-circle mr-1"></i> <strong>Вариант 2:</strong> Перераспределение — перевести средства из регионов с профицитом</p>
+                    <p><i class="fas fa-check-circle mr-1"></i> <strong>Вариант 3:</strong> Ожидание — перенести на следующ��й месяц по Merit Score (не FIFO)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Budget bar -->
     <div class="card-glass p-4">
@@ -96,6 +124,41 @@
         </div>
     </div>
 
+    <!-- Regional budget breakdown -->
+    {% if region_stats %}
+    <div class="card-glass p-5" x-data="{ showRegions: false }">
+        <button @click="showRegions = !showRegions" class="flex items-center justify-between w-full">
+            <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider"><i class="fas fa-map-location-dot mr-1"></i> Бюджет по регионам</h3>
+            <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform" :class="showRegions && 'rotate-180'"></i>
+        </button>
+        <div x-show="showRegions" x-cloak x-transition class="mt-4 space-y-3">
+            {% for r in region_stats %}
+            <div class="p-3 rounded-xl border {% if r.deficit > 0 %}border-red-200 bg-red-50/50{% elif r.surplus > 0 %}border-green-200 bg-green-50/50{% else %}border-gray-200{% endif %}">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm font-semibold text-gray-800">{{ r.name }}</span>
+                    <div class="flex items-center gap-3 text-xs">
+                        {% if r.deficit > 0 %}
+                        <span class="text-red-600 font-bold"><i class="fas fa-arrow-down mr-0.5"></i>Дефицит: {{ r.deficit|floatformat:0|intcomma }} ₸</span>
+                        {% elif r.surplus > 0 %}
+                        <span class="text-green-600 font-bold"><i class="fas fa-arrow-up mr-0.5"></i>Профицит: {{ r.surplus|floatformat:0|intcomma }} ₸</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="h-2 rounded-full bg-gray-200 overflow-hidden mb-1">
+                    {% if r.planned > 0 %}
+                    <div class="h-full rounded-full {% if r.deficit > 0 %}bg-red-400{% else %}bg-green-400{% endif %}" style="width: {% widthratio r.spent r.planned 100 %}%"></div>
+                    {% endif %}
+                </div>
+                <div class="flex justify-between text-[10px] text-gray-400">
+                    <span>Израсходовано: {{ r.spent|floatformat:0|intcomma }} ₸ / {{ r.planned|floatformat:0|intcomma }} ₸</span>
+                    <span>Очередь: {{ r.queue_amount|floatformat:0|intcomma }} ₸ · Остаток: {{ r.remaining|floatformat:0|intcomma }} ₸</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Queue table -->
     <div class="card-glass overflow-hidden">
         <div class="overflow-x-auto">
@@ -105,18 +168,28 @@
                         <th class="px-4 py-3">#</th>
                         <th class="px-4 py-3">Merit</th>
                         <th class="px-4 py-3">Заявитель</th>
-                        <th class="px-4 py-3">Направление</th>
+                        <th class="px-4 py-3">Регион</th>
                         <th class="px-4 py-3 text-right">Сумма</th>
                         <th class="px-4 py-3 text-right">Накопительно</th>
                         <th class="px-4 py-3">Статус</th>
-                        <th class="px-4 py-3">Разбивка Merit Score</th>
-                        <th class="px-4 py-3"></th>
+                        <th class="px-4 py-3">Merit разбивка</th>
+                        <th class="px-4 py-3">Действия</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in queue_data %}
-                    <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors {% if not item.within_budget %}bg-red-50/50{% endif %}"
-                        {% if not item.within_budget and item.rank == queue_data|length or item.within_budget and not forloop.last and not queue_data|length %}{% endif %}>
+                    <!-- Budget cutoff line -->
+                    {% if item.partial_amount > 0 %}
+                    <tr>
+                        <td colspan="9" class="px-4 py-2 bg-red-50 border-t-2 border-b-2 border-dashed border-red-300">
+                            <div class="flex items-center gap-2 text-xs text-red-700 font-bold">
+                                <i class="fas fa-scissors"></i>
+                                <span>Граница бюджета — ниже этой линии бюджет исчерпан (доступно {{ available_budget|floatformat:0|intcomma }} ₸)</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors {% if not item.within_budget and item.partial_amount == 0 %}bg-red-50/50{% endif %}">
                         <td class="px-4 py-3 font-bold text-gray-400">{{ item.rank }}</td>
                         <td class="px-4 py-3">
                             <div class="merit-ring border-3 {% if item.payment.merit_score >= 70 %}border-green-400 bg-green-50{% elif item.payment.merit_score >= 40 %}border-yellow-400 bg-yellow-50{% else %}border-red-400 bg-red-50{% endif %}">
@@ -126,11 +199,9 @@
                         <td class="px-4 py-3">
                             <div class="font-semibold text-gray-800">{{ item.app.applicant.name }}</div>
                             <div class="text-xs text-gray-400 font-mono">{{ item.app.number }}</div>
+                            <div class="text-[10px] text-gray-400">{{ item.app.subsidy_type.direction.name }}</div>
                         </td>
-                        <td class="px-4 py-3">
-                            <span class="text-xs">{{ item.app.subsidy_type.direction.name }}</span>
-                            <div class="text-[10px] text-gray-400">{{ item.app.subsidy_type.name|truncatewords:5 }}</div>
-                        </td>
+                        <td class="px-4 py-3 text-xs text-gray-600">{{ item.app.region }}</td>
                         <td class="px-4 py-3 text-right font-mono font-semibold">{{ item.payment.amount|floatformat:0|intcomma }} ₸</td>
                         <td class="px-4 py-3 text-right font-mono text-xs {% if item.within_budget %}text-green-600{% else %}text-red-600{% endif %}">
                             {{ item.cumulative|floatformat:0|intcomma }} ₸
@@ -146,29 +217,34 @@
                                 <i class="fas fa-university text-[10px]"></i> В Казначействе
                             </span>
                             {% endif %}
+                            {% if item.partial_amount > 0 %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 mt-1">
+                                <i class="fas fa-scissors text-[10px]"></i> Частичная
+                            </span>
+                            {% endif %}
                         </td>
                         <td class="px-4 py-3">
                             {% if item.payment.merit_breakdown %}
-                            <div class="space-y-1 min-w-[160px]">
+                            <div class="space-y-1 min-w-[140px]">
                                 <div class="flex items-center gap-1">
-                                    <span class="text-[9px] text-gray-400 w-14">Масштаб</span>
+                                    <span class="text-[9px] text-gray-400 w-12">Масшт.</span>
                                     <div class="merit-bar flex-1"><div class="merit-fill bg-blue-400" style="width: {{ item.payment.merit_breakdown.farm_scale }}%"></div></div>
-                                    <span class="text-[9px] font-mono text-gray-500 w-6 text-right">{{ item.payment.merit_breakdown.farm_scale|floatformat:0 }}</span>
+                                    <span class="text-[9px] font-mono text-gray-500 w-5 text-right">{{ item.payment.merit_breakdown.farm_scale|floatformat:0 }}</span>
                                 </div>
                                 <div class="flex items-center gap-1">
-                                    <span class="text-[9px] text-gray-400 w-14">Финансы</span>
+                                    <span class="text-[9px] text-gray-400 w-12">Финанс.</span>
                                     <div class="merit-bar flex-1"><div class="merit-fill bg-green-400" style="width: {{ item.payment.merit_breakdown.financial }}%"></div></div>
-                                    <span class="text-[9px] font-mono text-gray-500 w-6 text-right">{{ item.payment.merit_breakdown.financial|floatformat:0 }}</span>
+                                    <span class="text-[9px] font-mono text-gray-500 w-5 text-right">{{ item.payment.merit_breakdown.financial|floatformat:0 }}</span>
                                 </div>
                                 <div class="flex items-center gap-1">
-                                    <span class="text-[9px] text-gray-400 w-14">История</span>
+                                    <span class="text-[9px] text-gray-400 w-12">Истор.</span>
                                     <div class="merit-bar flex-1"><div class="merit-fill bg-purple-400" style="width: {{ item.payment.merit_breakdown.history }}%"></div></div>
-                                    <span class="text-[9px] font-mono text-gray-500 w-6 text-right">{{ item.payment.merit_breakdown.history|floatformat:0 }}</span>
+                                    <span class="text-[9px] font-mono text-gray-500 w-5 text-right">{{ item.payment.merit_breakdown.history|floatformat:0 }}</span>
                                 </div>
                                 <div class="flex items-center gap-1">
-                                    <span class="text-[9px] text-gray-400 w-14">Направл.</span>
+                                    <span class="text-[9px] text-gray-400 w-12">Направ.</span>
                                     <div class="merit-bar flex-1"><div class="merit-fill bg-yellow-400" style="width: {{ item.payment.merit_breakdown.direction_priority }}%"></div></div>
-                                    <span class="text-[9px] font-mono text-gray-500 w-6 text-right">{{ item.payment.merit_breakdown.direction_priority|floatformat:0 }}</span>
+                                    <span class="text-[9px] font-mono text-gray-500 w-5 text-right">{{ item.payment.merit_breakdown.direction_priority|floatformat:0 }}</span>
                                 </div>
                             </div>
                             {% else %}
@@ -176,15 +252,25 @@
                             {% endif %}
                         </td>
                         <td class="px-4 py-3">
-                            <a href="/applications/{{ item.app.id }}/" class="text-gray-400 hover:text-gray-600 transition-colors">
-                                <i class="fas fa-chevron-right"></i>
-                            </a>
+                            <div class="flex flex-col gap-1">
+                                <a href="/applications/{{ item.app.id }}/" class="text-xs text-blue-600 hover:text-blue-800">
+                                    <i class="fas fa-eye mr-0.5"></i> Открыть
+                                </a>
+                                {% if item.partial_amount > 0 and item.payment.status == 'initiated' %}
+                                <!-- Partial payment button -->
+                                <form method="post" action="/applications/{{ item.app.id }}/payment/" class="inline"
+                                      onsubmit="return confirm('Частичная выплата {{ item.partial_amount|floatformat:0 }} ₸ из {{ item.payment.amount|floatformat:0 }} ₸. Остаток перейдёт в лист ожидания. Продолжить?')">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="partial_payment">
+                                    <input type="hidden" name="partial_amount" value="{{ item.partial_amount }}">
+                                    <button type="submit" class="text-xs text-orange-600 hover:text-orange-800 font-semibold">
+                                        <i class="fas fa-scissors mr-0.5"></i> Частичная: {{ item.partial_amount|floatformat:0|intcomma }} ₸
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
-                    {% if item.within_budget and not forloop.last %}
-                    {% with next_idx=forloop.counter %}
-                    {% endwith %}
-                    {% endif %}
                     {% empty %}
                     <tr>
                         <td colspan="9" class="px-4 py-12 text-center text-gray-400">
@@ -200,14 +286,28 @@
 
     <!-- Legend -->
     <div class="card-glass p-4">
-        <div class="flex flex-wrap gap-4 text-xs text-gray-500">
-            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-green-400"></div> В пределах бюджета</div>
-            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-red-400"></div> Превышает доступный бюджет</div>
-            <div class="flex items-center gap-2"><i class="fas fa-sort-amount-down text-gray-400"></i> Сортировка по Merit Score (не по дате)</div>
+        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Как это работает</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600">
+            <div class="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                <p class="font-semibold text-gray-700 mb-1"><i class="fas fa-sort-amount-down text-blue-500 mr-1"></i> Merit Score вместо FIFO</p>
+                <p>Старая система: первый подал — первый получил. Наша: эффективные хозяйства с хорошей историей получают выплату первыми.</p>
+            </div>
+            <div class="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                <p class="font-semibold text-gray-700 mb-1"><i class="fas fa-scissors text-orange-500 mr-1"></i> Частичная выплата</p>
+                <p>Если бюджета не хватае�� на полную сумму — можно выплатить часть. Остаток переходит в лист ожидания на следующи�� период.</p>
+            </div>
+            <div class="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                <p class="font-semibold text-gray-700 mb-1"><i class="fas fa-exchange-alt text-purple-500 mr-1"></i> Перераспределение</p>
+                <p>Регионы с профицитом бюджета мо��ут передать средства в регионы с дефицитом — приоритизация по данным, а не вручную.</p>
+            </div>
+            <div class="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                <p class="font-semibold text-gray-700 mb-1"><i class="fas fa-calendar-alt text-green-500 mr-1"></i> Перенос на следующий месяц</p>
+                <p>Заявки за границей бюджета переносятся. В отличие от закона (по дате), мы переносим по Merit Score — справедливо.</p>
+            </div>
         </div>
-        <p class="text-[10px] text-gray-400 mt-2">
-            Merit Score определяет приоритет выплаты: крупные эффективные хозяйства с хорошей историей субсидий и приоритетным направлением получают выплату первыми.
-            Это заменяет старую систему FIFO (первый пришёл — первый получил).
+        <p class="text-[10px] text-gray-400 mt-3">
+            Согласно Приказу №108 МСХ РК: выплата субсидий по одобренным заявкам осуществляется в порядке очередности.
+            SubsidyAI заменяет очерёдность по дате на приоритизацию по эффективности (Merit Score).
         </p>
     </div>
 </div>
