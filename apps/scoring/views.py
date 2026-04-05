@@ -1234,7 +1234,7 @@ def commission(request):
 
     ranking_data = []
     cumulative = 0
-    for i, s in enumerate(scores[:100], 1):
+    for i, s in enumerate(scores, 1):
         cumulative += float(s.application.total_amount)
         ranking_data.append({
             'rank': i,
